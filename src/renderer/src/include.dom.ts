@@ -1,0 +1,184 @@
+export const includeDom: {
+
+  initDivDom: (inert?: boolean) => HTMLDivElement,
+  base: () => HTMLDivElement,
+  instancePanel: () => HTMLDivElement, 
+  addInstance: () => HTMLDivElement,
+  addTagBlock: ( inputId: string | null ) => HTMLDivElement,
+  addBookmarkSeelector: () => HTMLDivElement,
+  addRssFeedSeelector: () => HTMLDivElement,
+  addTextSelector: () => HTMLDivElement
+
+} = {
+
+  initDivDom: function (inert = true) {
+
+    const dom = document.createElement('div');
+    if (inert === true) dom.setAttribute('inert', 'true');
+    return dom;
+  },
+
+  base: function () {
+
+    const dom = this.initDivDom(false);
+    dom.innerHTML = `
+      <header class="animate__animated animate__fadeIn">
+        <div class="app-name">
+          <h1>cleepix</h1>
+        </div>
+        <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
+        <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
+        <div id="close-win"><button aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button></div>
+      </header>
+      <main id="insert-panel" class="animate__animated animate__fadeIn"></main>
+      `;
+    return dom;
+  },
+
+  instancePanel: function () {
+
+    const dom = this.initDivDom(false);
+    dom.classList.add('instance-panel');
+    dom.innerHTML = `
+      <div class="operation-etc-panel">
+        <div class="left-btns">
+          <button id="show-inscetance-modal-btn">+ インスタンス</button><button id="show-bookmark-modal-btn">+ ブックマーク</button>
+          <button id="show-rss-feed-modal-btn">+ RSS フィード</button><button id="show-text-modal-btn">+ 定型文</button>
+        </div>
+        <div class="search-box">
+          <input type="search" placeholder="検索キーワード" id="search-text">
+          <button id="send-search-query" aria-label="検索"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+        <div class="filter-parts">
+          <button id="change-bookmark-btn" title="ブックマークフィルター" aria-label="フィルター、ブックマーク"><i class="fa-solid fa-bookmark"></i></button>
+          <button id="change-rss-btn" title="RSSフィードフィルター" aria-label="フィルター、RSSフィード"><i class="fa-solid fa-rss"></i></button>
+          <button id="change-text-btn" title="定型文フィルター" aria-label="フィルター、定型文"><i class="fa-solid fa-file"></i></button>
+          <button id="change-design" title="デザイン切り替え" aria-label="デザイン切り替え"><i class="fa-solid fa-table-cells-large"></i></button>
+        </div>
+      </div>
+      <div class="tag-and-content-wrap">
+        <div class="tag-select-panel"></div>
+        <span draggable="true" class="resize-panel-bar"></span>
+        <div class="contents-panel">
+          <!--<iframe style="width:100%;aspect-ratio:16 / 9;" src="https://etc.private.x-sv.com" title="爽快感・透明感が半端ない中毒性MAXのボカロ曲メドレー【全20曲】" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>-->
+          <iframe style="width:100%;aspect-ratio:16 / 9;" src="https://www.youtube.com/embed/irMD1KMIYE4" title="夢花火 / 百鬼あやめ original" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          <!--<blockquote class="twitter-tweet" data-theme="dark"><p lang="en" dir="ltr">First Starlink v2 satellites reach orbit <a href="https://t.co/0l08568mJ9">pic.twitter.com/0l08568mJ9</a></p>&mdash; Elon Musk (@elonmusk) <a href="https://twitter.com/elonmusk/status/1630394434847227909?ref_src=twsrc%5Etfw">February 28, 2023</a></blockquote>-->
+          <!--<webview id="foo" src="https://etc.private.x-sv.com" style="width:100%;aspect-ratio:16 / 9;"></webview>-->
+          <!--<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>-->
+        </div>
+      </div>
+    `;
+    return dom;
+  },
+
+  addInstance: function () {
+
+    const dom = this.initDivDom();
+    dom.id = 'show-inscetance';
+    dom.innerHTML = `
+      <div class="instance-select-element-wrap"></div>
+    `;
+    dom.innerHTML += `
+      <div class="instance-select-element">
+        <div class="instance-names" tabindex="0" aria-label="インスタンスラベルフィールド">
+          <span class="label-group"></span>
+          <button aria-label="インスタンス追加" title="インスタンス追加" id="add-instance-btn">＋</button>
+        </div>
+      </div>
+    `;
+    return dom;
+  },
+
+  addTagBlock: function ( inputId = null ) {
+
+    const dom = this.initDivDom(false);
+    dom.classList.add('tags_blocks_wrap');
+    dom.innerHTML = `
+      <span class="selected-label"></span>
+      <span class="tag_input_wrap">
+        <input class="tag_input" placeholder="追加するタグを入力" type="text">
+        <span inert class="tag_suggest"></span>
+      </span>
+    `;
+
+    if ( inputId !== null ) {
+      dom.querySelector<HTMLInputElement>('input.tag_input')!.id = inputId;
+    }
+    return dom;
+  },
+
+  addBookmarkSeelector: function () {
+
+    const dom = this.initDivDom();
+    dom.id = 'show-add-bookmark-modal';
+    dom.innerHTML = `
+      <div class="add-bookmark-modal-wrap"></div>
+      <div class="add-bookmark-modal">
+        <h2>ブックマークを追加</h2>
+        <fieldset class="forms">
+          <legend>ブックマークを追加するための入力フィールド</legend>
+          <div class="label"><label for="add-bookmark-title">タイトル</label></div>
+          <div class="form"><input type="text" id="add-bookmark-title"></div>
+          <div class="label"><label for="add-bookmark-url">URL</label></div>
+          <div class="form"><input type="url" id="add-bookmark-url"></div>
+          <div class="label"><label for="add-bookmark-thumb">サムネイル</label></div>
+          <div class="form">
+            <input type="file" id="add-bookmark-thumb">
+            <span>※ご自身でサムネイル画像を設定したい場合</span>
+          </div>
+          <div class="label"><label for="add-bookmark-tags">タグ</label></div>
+          <div class="form tags"></div>
+          <button class="send-btn" id="add-bookmark-btn">追加</button>
+        </fieldset>
+      </div>
+    `;
+    return dom;
+  },
+
+  addRssFeedSeelector: function () {
+
+    const dom = this.initDivDom();
+    dom.id = 'show-add-rss-feed-modal';
+    dom.innerHTML = `
+      <div class="add-rss-feed-modal-wrap"></div>
+      <div class="add-rss-feed-modal">
+        <h2>RSSフィードを追加</h2>
+        <fieldset class="forms">
+          <legend>RSSフィードを追加するための入力フィールド</legend>
+          <div class="label"><label for="add-rss-feed-title">サイトタイトル</label></div>
+          <div class="form"><input type="text" id="add-rss-feed-title"></div>
+          <div class="label"><label for="add-rss-feed-url">フィードURL</label></div>
+          <div class="form"><input type="url" id="add-rss-feed-url"></div>
+          <div class="label"><label for="add-rss-feed-thumb">サイトアイコン</label></div>
+          <div class="form"><input type="file" id="add-rss-feed-thumb"></div>
+          <div class="label"><label for="add-rss-tags">タグ</label></div>
+          <div class="form tags"></div>
+          <button class="send-btn" id="add-rss-feed-btn">追加</button>
+        </fieldset>
+      </div>
+    `;
+
+    return dom;
+  },
+
+  addTextSelector: function () {
+
+    const dom = this.initDivDom();
+    dom.id = 'show-add-text-modal';
+    dom.innerHTML = `
+      <div class="add-text-modal-wrap"></div>
+      <div class="add-text-modal">
+        <h2>定型文・メモを追加</h2>
+        <fieldset class="forms">
+          <legend>定型文を追加するための入力フィールド</legend>
+          <div class="label"><label for="add-text-title">タイトル</label></div>
+          <div class="form"><input type="text" id="add-text-title"></div>
+          <div id="show-add-text-field"></div>
+          <button class="send-btn" id="add-text-btn">追加</button>
+        </fieldset>
+      </div>
+    `;
+
+    return dom;
+  }
+}
