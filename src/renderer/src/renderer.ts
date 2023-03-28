@@ -4,7 +4,6 @@ import "../../../node_modules/quill/dist/quill.snow.css";
 import Quill from "quill";
 import "../../preload/index.d";
 import { includeDom } from "./include.dom";
-import { resolve } from "path";
 
 declare global {
   interface WindowEventMap {
@@ -383,7 +382,11 @@ export const CleePIX: {
 
       let currentTagNameWrap: HTMLSpanElement | null = null;
       const setTagEvent: (
-        target: { expansionButtonList: HTMLButtonElement[], tagNameButtonList: HTMLButtonElement[] },
+        target: {
+          expansionButtonList: HTMLButtonElement[],
+          tagNameButtonList: HTMLButtonElement[],
+          tagMenuButtonList: HTMLButtonElement[]
+        },
         isFirst?: boolean
       ) => void = (target, isFirst = false) => {
 
@@ -400,11 +403,11 @@ export const CleePIX: {
               await getTagTree(li, Number(button.dataset.tagId));
             }
 
-            const subUl = li.querySelector('ul')!;
+            const subUl = li.querySelector<HTMLUListElement>('ul.tag-tree')!;
             if (button.dataset.opend === 'false') {
               subUl.hidden = false;
               button.dataset.opend = 'true';
-              button.innerHTML = '<i class="fa-solid fa-chevron-up"></i>';
+              button.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
             } else {
               subUl.hidden = true;
               button.dataset.opend = 'false';
@@ -452,6 +455,7 @@ export const CleePIX: {
 
           const expansionButtonList: HTMLButtonElement[] = []
           const tagNameButtonList: HTMLButtonElement[] = []
+          const tagMenuButtonList: HTMLButtonElement[] = []
           if ( treeItems.length !== 0 ) {
             treeItems.forEach(tag => {
 
@@ -461,6 +465,8 @@ export const CleePIX: {
               buttonWrap.classList.add('for-hover');
               const expansionButton = document.createElement('button');
               const tagNameButton = document.createElement('button');
+              const tagMenuButton = document.createElement('button');
+              const tagMenuElement = document.createElement('ul');
 
               expansionButton.classList.add('expansion');
               expansionButton.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
@@ -472,10 +478,34 @@ export const CleePIX: {
               tagNameButton.textContent = tag.name;
               tagNameButton.dataset.tagId = tag.id;
 
+              tagMenuButton.classList.add('tag-menu-btn');
+              tagMenuButton.dataset.tagId = tag.id;
+              tagMenuButton.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+              tagMenuButton.ariaLabel = 'このタグのメニューを開く';
+
+              tagMenuElement.classList.add('tag-menu-element');
+              tagMenuElement.hidden = true;
+              [
+                { class: '.name-change', name: '名前を変更' },
+                { class: '.delete-tag', name: '削除' },
+                { class: '.add-new-tag', name: '新規タグ追加' }
+              ].forEach( item => {
+
+                const li = document.createElement('li');
+                li.classList.add( item.class );
+                li.textContent = item.name;
+                li.tabIndex = 0;
+                li.role = 'button';
+                tagMenuElement.append(li);
+              });
+
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
+              tagMenuButtonList.push(tagMenuButton);
               buttonWrap.append(expansionButton);
               buttonWrap.append(tagNameButton);
+              buttonWrap.append(tagMenuButton);
+              buttonWrap.append(tagMenuElement);
               li.append(buttonWrap);
               ul.append(li);
             });
@@ -499,7 +529,7 @@ export const CleePIX: {
               ul.inert = true;
             } else ul.classList.add('animate__fadeInLeft');
 
-            setTagEvent({ expansionButtonList, tagNameButtonList }, true);
+            setTagEvent({ expansionButtonList, tagNameButtonList, tagMenuButtonList }, true);
 
             CleePIX.liveDom.tagTreePanel[id] = ul;
             CleePIX.liveDom.instancePanel
@@ -509,10 +539,10 @@ export const CleePIX: {
             ul.hidden = true;
             ul.classList.add('sub', 'animate__fadeInLeft');
             target.insertAdjacentElement('beforeend', ul);
-            setTagEvent({ expansionButtonList, tagNameButtonList });
+            setTagEvent({ expansionButtonList, tagNameButtonList, tagMenuButtonList });
           }
 
-          resolve({ expansionButtonList, tagNameButtonList });
+          resolve({ expansionButtonList, tagNameButtonList, tagMenuButtonList });
         });
       }
 
@@ -548,4 +578,5 @@ export const CleePIX: {
   }
 }
 
+// App init.
 window.addEventListener('DOMContentLoaded', () => { CleePIX.init() });
