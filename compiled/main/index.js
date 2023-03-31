@@ -81,6 +81,29 @@ const CleePIXMain = {
       this.Windows.main?.webContents.send("instance-update", this.config.store);
       return newInstance;
     });
+    electron.ipcMain.on("remove-instance", (_, id) => {
+      let instancePath = "";
+      let instanceId = 0;
+      let indexTemp = 0;
+      this.configTemp.instance?.forEach((ite, index) => {
+        if (ite.id === id) {
+          indexTemp = index;
+          instanceId = ite.id;
+          instancePath = ite.path;
+          return;
+        }
+      });
+      this.storage[instanceId].db?.close();
+      fs.unlink(instancePath, (e) => {
+        console.log(e);
+        if (e === null) {
+          delete this.storage[instanceId];
+          this.configTemp.instance?.splice(indexTemp, 1);
+          this.config.store = this.configTemp;
+          this.Windows.main?.webContents.send("ite-change", this.config.store);
+        }
+      });
+    });
     electron.ipcMain.handle("get-add-tag-list", async (_, query) => {
       return this.storage[query.id].db?.prepare(
         `SELECT * FROM tags WHERE name LIKE ?`

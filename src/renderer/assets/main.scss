@@ -210,21 +210,48 @@ main {
       height: 50px;
       @include flexbese;
       .left-btns {
-        flex-basis: 25%;
-        button {
-          width: 50%;
-          height: 50%;
-          text-align: center;
-          border-radius: 15px;
-          padding: 0;
-          border: unset;
-          font-size: 11pt;
-          color: $text-color;
-          background-color: transparent;
-          cursor: pointer;
-          transition: all 0.4s;
-          &:hover {
-            background-color: $hover-bg-color;
+        flex-basis: 340px;
+        .large-btn {
+          float: left;
+          width: 20%;
+          height: 100%;
+          button {
+            width: 100%;
+            height: 100%;
+            line-height: 100%;
+            font-size: 21pt;
+            text-align: center;
+            border-radius: 15px;
+            padding: 0;
+            border: unset;
+            color: $text-color;
+            background-color: transparent;
+            cursor: pointer;
+            transition: all 0.4s;
+            &:hover {
+              background-color: $hover-bg-color;
+            }
+          }
+        }
+        .btn-list {
+          float: left;
+          width: 80%;
+          button {
+            float: left;
+            width: 50%;
+            height: 50%;
+            text-align: center;
+            border-radius: 15px;
+            padding: 0;
+            border: unset;
+            font-size: 11pt;
+            color: $text-color;
+            background-color: transparent;
+            cursor: pointer;
+            transition: all 0.4s;
+            &:hover {
+              background-color: $hover-bg-color;
+            }
           }
         }
         /*button#add-inscetance-btn {
@@ -235,7 +262,7 @@ main {
         }*/
       }
       .search-box {
-        flex-basis: 55%;
+        flex-basis: calc( 100% - 612px );
         position: relative;
         input[type="search"] {
           width: 100%;
@@ -265,7 +292,7 @@ main {
         }
       }
       .filter-parts {
-        flex-basis: 20%;
+        flex-basis: 272px;
         text-align: right;
         button {
           display: inline-block;
@@ -304,7 +331,7 @@ main {
         max-width: 500px;
         flex-basis: 250px;
         overflow: hidden;
-        > ul.tag-tree {
+        ul.tag-tree {
           position: absolute;
           top: 0;
           left: 0;
@@ -315,6 +342,17 @@ main {
           li {
             //padding: 2px 10px;
             white-space: nowrap;
+            form.insert-tag-form {
+              display: block;
+              width: 100%;
+              padding-left: 10px;
+              input[type="text"] {
+                width: 80%;
+                padding: 5px;
+                margin-left: 13px;
+                font-size: 11pt;
+              }
+            }
             span.for-hover {
               position: relative;
               display: inline-block;
@@ -344,22 +382,6 @@ main {
                 padding: 2px;
                 height: 100%;
                 line-height: 100%;
-              }
-              ul.tag-menu-element {
-                position: absolute;
-                top: 100%;
-                right: 0;
-                width: 100px;
-                background-color: black;
-                z-index: 1;
-                li {
-                  width: 100%;
-                  cursor: pointer;
-                  transition: all .1s;
-                  &:hover {
-                    background-color: #414141;
-                  }
-                }
               }
             }
           }
@@ -601,5 +623,30 @@ fieldset.forms {
     color: $text-color;
     margin-top: 20px;
     cursor: pointer;
+  }
+}
+
+div#show-tag-context-menu-wrap {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+}
+div#show-tag-context-menu {
+  position: fixed;
+  ul.tag-menu-element {
+    list-style: none;
+    width: 150px;
+    background-color: black;
+    li {
+      width: 100%;
+      cursor: pointer;
+      padding: 3px 10px;
+      transition: all .1s;
+      &:hover {
+        background-color: #414141;
+      }
+    }
   }
 }

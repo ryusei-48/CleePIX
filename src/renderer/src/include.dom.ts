@@ -31,6 +31,10 @@ export const includeDom: {
         <div id="close-win"><button aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button></div>
       </header>
       <main id="insert-panel" class="animate__animated animate__fadeIn"></main>
+      <div class="tmp-doms">
+        <div hidden id="show-tag-context-menu-wrap"></div>
+        <div hidden id="show-tag-context-menu"></div>
+      </div>
       `;
     return dom;
   },
@@ -42,8 +46,15 @@ export const includeDom: {
     dom.innerHTML = `
       <div class="operation-etc-panel">
         <div class="left-btns">
-          <button id="show-inscetance-modal-btn">+ インスタンス</button><button id="show-bookmark-modal-btn">+ ブックマーク</button>
-          <button id="show-rss-feed-modal-btn">+ RSS フィード</button><button id="show-text-modal-btn">+ 定型文</button>
+          <div class="large-btn">
+            <button id="add-new-tag" title="新規タグ追加" aria-label="新規タグ追加"><i class="fa-solid fa-plus"></i></button>
+          </div>
+          <div class="btn-list">
+            <button id="show-inscetance-modal-btn">+ インスタンス</button>
+            <button id="show-bookmark-modal-btn">+ ブックマーク</button>
+            <button id="show-rss-feed-modal-btn">+ RSS フィード</button>
+            <button id="show-text-modal-btn">+ 定型文</button>
+          </div>
         </div>
         <div class="search-box">
           <input type="search" placeholder="検索キーワード" id="search-text">

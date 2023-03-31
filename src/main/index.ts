@@ -111,6 +111,30 @@ const CleePIXMain: {
       return newInstance;
     });
 
+    ipcMain.on('remove-instance', ( _, id ) => {
+      let instancePath: string = '';
+      let instanceId: number = 0;
+      let indexTemp: number = 0;
+      this.configTemp.instance?.forEach( ( ite, index ) => {
+        if ( ite.id === id ) {
+          indexTemp = index;
+          instanceId = ite.id;
+          instancePath = ite.path; return;
+        }
+      });
+
+      this.storage[ instanceId ].db?.close();
+      fs.unlink( instancePath, (e) => {
+        console.log(e);
+        if ( e === null ) {
+          delete this.storage[ instanceId ];
+          this.configTemp.instance?.splice( indexTemp, 1 );
+          this.config.store = this.configTemp;
+          this.Windows.main?.webContents.send('ite-change', this.config.store);
+        }
+      });
+    });
+
     ipcMain.handle('get-add-tag-list', async (_, query) => {
       return this.storage[query.id].db?.prepare(
         `SELECT * FROM tags WHERE name LIKE ?`

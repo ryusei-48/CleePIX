@@ -4,6 +4,7 @@ import "../../../node_modules/quill/dist/quill.snow.css";
 import Quill from "quill";
 import "../../preload/index.d";
 import { includeDom } from "./include.dom";
+import { resolve } from "path";
 
 declare global {
   interface WindowEventMap {
@@ -92,7 +93,7 @@ export const CleePIX: {
 
     window.electron.ipcRenderer.on('instance-update', (_, ites) => {
       this.instanceDBs = ites;
-      window.dispatchEvent(new CustomEvent('ite_change', { detail: CleePIX.currentInstanceId }));
+      //window.dispatchEvent(new CustomEvent('ite_change', { detail: CleePIX.currentInstanceId }));
     });
   },
 
@@ -126,9 +127,14 @@ export const CleePIX: {
           if (confirm('インスタンスを削除してもよろしいですか？')) {
             labelWrap.remove();
             delete textInputList[deleteBtn.dataset.id!];
-            console.log(deleteBtn.outerHTML);
-            console.log(textInputList);
-            Object.values(textInputList).shift()?.click();
+            CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].remove();
+            delete CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
+
+            const nextTextInput = Object.values(textInputList).shift()!;
+            nextTextInput.click();
+            currentTextInput = nextTextInput;
+
+            window.electron.ipcRenderer.send('remove-instance', Number(deleteBtn.dataset.id!));
           }
         });
 
@@ -160,12 +166,12 @@ export const CleePIX: {
 
           window.dispatchEvent(new CustomEvent('ite_change', { detail: { id: orldId } }));
 
-          console.log(CleePIX.currentInstanceId);
+          //console.log(CleePIX.currentInstanceId);
           currentTextInput = <HTMLInputElement>e.target;
         });
         textInput.addEventListener('focusout', () => { textInput.readOnly = true });
 
-        if (label === 'default') {
+        if (id === '1') {
           currentTextInput = textInput;
           currentTextInput.style.borderBottomColor = 'lightgreen';
           currentTextInput.style.backgroundColor = '#294c29';
@@ -390,13 +396,13 @@ export const CleePIX: {
         isFirst?: boolean
       ) => void = (target, isFirst = false) => {
 
-        if ( target.expansionButtonList[0].dataset.tagId === 'none' ) return;
+        if (target.expansionButtonList[0].dataset.tagId === 'none') return;
 
-        target.expansionButtonList.forEach(button => {
+        target.expansionButtonList.forEach((button, index) => {
 
-          button.addEventListener('click', async (e) => {
+          const li = <HTMLLIElement>button.parentNode?.parentNode;
 
-            const li = <HTMLLIElement>button.parentNode?.parentNode;
+          button.addEventListener('click', async () => {
 
             if (button.dataset.loaded === 'false' || isFirst === false) {
               button.dataset.loaded = 'true';
@@ -414,13 +420,23 @@ export const CleePIX: {
               button.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
             }
           })
+
+          li.addEventListener('mouseover', () => {
+
+            target.tagMenuButtonList[index].hidden = false;
+          });
+
+          li.addEventListener('mouseout', () => {
+
+            target.tagMenuButtonList[index].hidden = true;
+          });
         });
 
-        target.tagNameButtonList.forEach( button => {
+        target.tagNameButtonList.forEach(button => {
 
           button.addEventListener('click', () => {
 
-            if ( currentTagNameWrap !== null ) {
+            if (currentTagNameWrap !== null) {
               currentTagNameWrap.style.removeProperty('background-color');
             }
             const buttonWrap = <HTMLSpanElement>button.parentNode;
@@ -428,9 +444,50 @@ export const CleePIX: {
             currentTagNameWrap = buttonWrap;
           })
         });
+
+        const showMenuDomWrap = CleePIX.liveDom.base.querySelector<HTMLDivElement>('div#show-tag-context-menu-wrap')!;
+        const showMenuDom = CleePIX.liveDom.base.querySelector<HTMLDivElement>('div#show-tag-context-menu')!;
+
+        target.tagMenuButtonList.forEach((button) => {
+
+          button.addEventListener('click', () => {
+
+            const tagMenuElement = document.createElement('ul');
+            tagMenuElement.classList.add('tag-menu-element');
+            [
+              { class: 'name-change', name: '名前を変更' },
+              { class: 'delete-tag', name: '削除' },
+              { class: 'add-new-tag', name: '新規タグ追加' }
+            ].forEach(item => {
+
+              const li = document.createElement('li');
+              li.classList.add(item.class, 'tag-menu');
+              li.textContent = item.name;
+              li.tabIndex = 0;
+              li.role = 'button';
+              tagMenuElement.append(li);
+            });
+
+            showMenuDom.innerHTML = '';
+            showMenuDom.append(tagMenuElement);
+
+            const pos = button.getBoundingClientRect();
+            showMenuDom.style.top = `${pos.top}px`;
+            showMenuDom.style.left = `${pos.left + pos.width}px`;
+
+            showMenuDomWrap.hidden = false;
+            showMenuDom.hidden = false;
+          });
+        });
+
+        showMenuDomWrap.addEventListener('click', () => {
+
+          showMenuDomWrap.hidden = true;
+          showMenuDom.hidden = true;
+        });
       }
 
-      const getTagTree = async (target: HTMLLIElement | null, id: number): Promise<{ [key: string]: HTMLButtonElement[] | null}> => {
+      const getTagTree = async (target: HTMLLIElement | null, id: number): Promise<{ [key: string]: HTMLButtonElement[] | HTMLUListElement[] | null }> => {
 
         return new Promise(async (resolve) => {
 
@@ -456,7 +513,7 @@ export const CleePIX: {
           const expansionButtonList: HTMLButtonElement[] = []
           const tagNameButtonList: HTMLButtonElement[] = []
           const tagMenuButtonList: HTMLButtonElement[] = []
-          if ( treeItems.length !== 0 ) {
+          if (treeItems.length !== 0) {
             treeItems.forEach(tag => {
 
               const li = document.createElement('li');
@@ -465,8 +522,7 @@ export const CleePIX: {
               buttonWrap.classList.add('for-hover');
               const expansionButton = document.createElement('button');
               const tagNameButton = document.createElement('button');
-              const tagMenuButton = document.createElement('button');
-              const tagMenuElement = document.createElement('ul');
+              const tagMenuButton = document.createElement('button')
 
               expansionButton.classList.add('expansion');
               expansionButton.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
@@ -479,25 +535,10 @@ export const CleePIX: {
               tagNameButton.dataset.tagId = tag.id;
 
               tagMenuButton.classList.add('tag-menu-btn');
+              tagMenuButton.hidden = true;
               tagMenuButton.dataset.tagId = tag.id;
               tagMenuButton.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
               tagMenuButton.ariaLabel = 'このタグのメニューを開く';
-
-              tagMenuElement.classList.add('tag-menu-element');
-              tagMenuElement.hidden = true;
-              [
-                { class: '.name-change', name: '名前を変更' },
-                { class: '.delete-tag', name: '削除' },
-                { class: '.add-new-tag', name: '新規タグ追加' }
-              ].forEach( item => {
-
-                const li = document.createElement('li');
-                li.classList.add( item.class );
-                li.textContent = item.name;
-                li.tabIndex = 0;
-                li.role = 'button';
-                tagMenuElement.append(li);
-              });
 
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
@@ -505,11 +546,10 @@ export const CleePIX: {
               buttonWrap.append(expansionButton);
               buttonWrap.append(tagNameButton);
               buttonWrap.append(tagMenuButton);
-              buttonWrap.append(tagMenuElement);
               li.append(buttonWrap);
               ul.append(li);
             });
-          }else {
+          } else {
             const li = document.createElement('li');
             li.role = 'treeitem';
             const button = document.createElement('button');
@@ -517,9 +557,9 @@ export const CleePIX: {
             button.dataset.tagId = 'none';
             button.textContent = '登録無し';
 
-            expansionButtonList.push( button );
-            li.append( button );
-            ul.append( li );
+            expansionButtonList.push(button);
+            li.append(button);
+            ul.append(li);
           }
 
           if (target === null) {
@@ -529,7 +569,9 @@ export const CleePIX: {
               ul.inert = true;
             } else ul.classList.add('animate__fadeInLeft');
 
-            setTagEvent({ expansionButtonList, tagNameButtonList, tagMenuButtonList }, true);
+            setTagEvent({
+              expansionButtonList, tagNameButtonList, tagMenuButtonList
+            }, true);
 
             CleePIX.liveDom.tagTreePanel[id] = ul;
             CleePIX.liveDom.instancePanel
@@ -539,12 +581,49 @@ export const CleePIX: {
             ul.hidden = true;
             ul.classList.add('sub', 'animate__fadeInLeft');
             target.insertAdjacentElement('beforeend', ul);
-            setTagEvent({ expansionButtonList, tagNameButtonList, tagMenuButtonList });
+            setTagEvent({
+              expansionButtonList, tagNameButtonList, tagMenuButtonList
+            }, true);
           }
 
           resolve({ expansionButtonList, tagNameButtonList, tagMenuButtonList });
         });
       }
+
+      function insertNewTag(targeUl: HTMLUListElement | null = null, parentTagId: number | null = null): void {
+
+        const li = document.createElement('li');
+        const form = document.createElement('form');
+        const input = document.createElement('input');
+
+        li.role = 'treeitem';
+        form.classList.add('insert-tag-form');
+        form.addEventListener('submit', e => { e.preventDefault() });
+        form.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        input.type = 'text';
+        input.addEventListener('keydown', (e) => {
+
+          if (e.code === 'Enter' && e.isComposing === false) {
+            li.remove();
+          }
+        });
+        input.addEventListener('focusout', () => { li.remove() });
+
+        form.append(input);
+        li.append(form);
+
+        if (targeUl === null || parentTagId === null) {
+          CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].append(li);
+        } else {
+          targeUl.append(li);
+        }
+
+        input.focus();
+      }
+
+      CleePIX.liveDom.instancePanel
+        .querySelector<HTMLButtonElement>('#add-new-tag')!
+        .addEventListener('click', () => { insertNewTag() });
 
       CleePIX.instanceDBs.forEach(db => {
         getTagTree(null, db.id).then(res => {
@@ -555,8 +634,10 @@ export const CleePIX: {
       });
 
       window.addEventListener('ite_change', (e) => {
-        CleePIX.liveDom.tagTreePanel[e.detail.id].classList.replace('animate__fadeInLeft', 'animate__fadeOutRight');
-        CleePIX.liveDom.tagTreePanel[e.detail.id].inert = true;
+        if (CleePIX.liveDom.tagTreePanel[e.detail.id] !== undefined) {
+          CleePIX.liveDom.tagTreePanel[e.detail.id].classList.replace('animate__fadeInLeft', 'animate__fadeOutRight');
+          CleePIX.liveDom.tagTreePanel[e.detail.id].inert = true;
+        }
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].classList.replace('animate__fadeOutRight', 'animate__fadeInLeft');
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].inert = false;
       }, false);
