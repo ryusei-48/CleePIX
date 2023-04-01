@@ -109,6 +109,11 @@ const CleePIXMain = {
         `SELECT * FROM tags WHERE name LIKE ?`
       ).all(query.keyword + "%");
     });
+    electron.ipcMain.handle("add-tag-suggest", (_, query) => {
+      return this.storage[query.id].db?.prepare(
+        `SELECT * FROM tags WHERE name LIKE ?`
+      ).get(query.value + "%");
+    });
     electron.ipcMain.handle("get-tag-tree", async (_, id) => {
       let res, editres = [];
       try {

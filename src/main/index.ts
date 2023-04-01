@@ -141,6 +141,18 @@ const CleePIXMain: {
       )!.all(query.keyword + '%');
     });
 
+    ipcMain.handle('add-tag-suggest', ( _, query ) => {
+      return this.storage[query.id].db?.prepare(
+        `SELECT * FROM tags WHERE name LIKE ?`
+      )!.get( query.value + '%' );
+    });
+
+    ipcMain.handle('add-tag', ( _, query ) => {
+      return this.storage[query.id].db?.prepare(
+        `INSERT INTO tags (name) VALUES ( ? )`
+      )!.run( query.name );
+    });
+
     ipcMain.handle('get-tag-tree', async (_, id) => {
       let res: null | any[], editres: any[] = [];
       try {

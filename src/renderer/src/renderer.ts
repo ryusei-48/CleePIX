@@ -448,7 +448,7 @@ export const CleePIX: {
         const showMenuDomWrap = CleePIX.liveDom.base.querySelector<HTMLDivElement>('div#show-tag-context-menu-wrap')!;
         const showMenuDom = CleePIX.liveDom.base.querySelector<HTMLDivElement>('div#show-tag-context-menu')!;
 
-        target.tagMenuButtonList.forEach((button) => {
+        target.tagMenuButtonList.forEach((button, index) => {
 
           button.addEventListener('click', () => {
 
@@ -463,8 +463,31 @@ export const CleePIX: {
               const li = document.createElement('li');
               li.classList.add(item.class, 'tag-menu');
               li.textContent = item.name;
+              li.dataset.tagId = button.dataset.tagId;
               li.tabIndex = 0;
               li.role = 'button';
+
+              switch (item.class) {
+                case 'add-new-tag':
+                  li.addEventListener('click', async () => {
+                    const targetLi = <HTMLLIElement>target.tagNameButtonList[index].parentNode?.parentNode;
+                    let subUl = targetLi.querySelector<HTMLUListElement>('ul.tag-tree');
+                    if (subUl === null) {
+                      await getTagTree(targetLi, Number(button.dataset.tagId));
+                      subUl = targetLi.querySelector<HTMLUListElement>('ul.tag-tree.sub')!;
+                    }
+                    target.expansionButtonList[index].dataset.loaded = 'true';
+                    if (target.expansionButtonList[index].dataset.opend === 'false') {
+                      target.expansionButtonList[index].dataset.opend = 'true';
+                      subUl.hidden = false;
+                    }
+                    insertNewTag(subUl, Number(button.dataset.tagId));
+                    showMenuDomWrap.hidden = true;
+                    showMenuDom.hidden = true;
+                  });
+                  break;
+              }
+
               tagMenuElement.append(li);
             });
 
@@ -487,6 +510,18 @@ export const CleePIX: {
         });
       }
 
+      function initTagTreeUl(isRoot: boolean = false): HTMLUListElement {
+
+        const ul = document.createElement('ul');
+        isRoot === true ? ul.classList.add('tag-tree', 'animate__animated')
+          : ul.classList.add('tag-tree', 'sub', 'animate__animated');
+        ul.tabIndex = 0;
+        ul.role = isRoot === true ? 'tree' : 'group';
+        ul.ariaLabel = 'タグ選択ツリー';
+
+        return ul;
+      }
+
       const getTagTree = async (target: HTMLLIElement | null, id: number): Promise<{ [key: string]: HTMLButtonElement[] | HTMLUListElement[] | null }> => {
 
         return new Promise(async (resolve) => {
@@ -503,12 +538,8 @@ export const CleePIX: {
             }
           }
 
-          const ul = document.createElement('ul');
-          ul.classList.add('tag-tree', 'animate__animated');
-          ul.dataset.instanceId = `${id}`;
-          ul.tabIndex = 0;
-          ul.role = 'tree';
-          ul.ariaLabel = 'タグ選択ツリー';
+          const isRoot = target === null ? true : false;
+          const ul = initTagTreeUl(isRoot);
 
           const expansionButtonList: HTMLButtonElement[] = []
           const tagNameButtonList: HTMLButtonElement[] = []
@@ -528,7 +559,7 @@ export const CleePIX: {
               expansionButton.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
               expansionButton.dataset.opend = 'false';
               expansionButton.dataset.tagId = tag.id;
-              expansionButton.dataset.loaded = 'false';
+              expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
               tagNameButton.classList.add('tag-name')
               tagNameButton.textContent = tag.name;
@@ -590,7 +621,7 @@ export const CleePIX: {
         });
       }
 
-      function insertNewTag(targeUl: HTMLUListElement | null = null, parentTagId: number | null = null): void {
+      function insertNewTag(targeUl: HTMLUListElement | null = null, tagId: number | null = null): void {
 
         const li = document.createElement('li');
         const form = document.createElement('form');
@@ -602,9 +633,24 @@ export const CleePIX: {
         form.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
         input.type = 'text';
         input.addEventListener('keydown', (e) => {
-
           if (e.code === 'Enter' && e.isComposing === false) {
             li.remove();
+          }
+        });
+        input.addEventListener('keyup', async (e) => {
+          if (
+            e.isComposing === false && input.value !== '' &&
+            e.code !== 'Backspace' && e.code !== 'ArrowLeft' && e.code !== 'ArrowRight'
+            ) {
+            const suggest = await window.electron.ipcRenderer
+              .invoke('add-tag-suggest', { id: CleePIX.currentInstanceId, value: input.value });
+            if ( suggest !== undefined ) {
+              const strlen = input.value.length;
+              input.value = suggest.name;
+              input.selectionStart = strlen;
+              input.selectionEnd = suggest.name.length;
+              input.focus();
+            }
           }
         });
         input.addEventListener('focusout', () => { li.remove() });
@@ -612,7 +658,7 @@ export const CleePIX: {
         form.append(input);
         li.append(form);
 
-        if (targeUl === null || parentTagId === null) {
+        if (targeUl === null || tagId === null) {
           CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].append(li);
         } else {
           targeUl.append(li);
