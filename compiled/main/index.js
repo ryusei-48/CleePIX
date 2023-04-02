@@ -114,6 +114,28 @@ const CleePIXMain = {
         `SELECT * FROM tags WHERE name LIKE ?`
       ).get(query.value + "%");
     });
+    electron.ipcMain.handle("add-tag", (_, query) => {
+      let res = null;
+      try {
+        res = this.storage[query.instanceId].db?.prepare(
+          `SELECT * FROM tags WHERE name = ?`
+        ).get(query.name);
+        if (res === void 0) {
+          res = this.storage[query.instanceId].db.prepare(
+            `INSERT INTO tags (name) VALUES ( ? )`
+          ).run(query.name);
+          if (query.parentTagId !== null) {
+            this.storage[query.instanceId].db.prepare(
+              `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
+            ).run(query.parentTagId, res.lastInsertRowid);
+          }
+        }
+        return res;
+      } catch (e) {
+        console.log(e);
+        return null;
+      }
+    });
     electron.ipcMain.handle("get-tag-tree", async (_, id) => {
       let res, editres = [];
       try {

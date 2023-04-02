@@ -148,9 +148,23 @@ const CleePIXMain: {
     });
 
     ipcMain.handle('add-tag', ( _, query ) => {
-      return this.storage[query.id].db?.prepare(
-        `INSERT INTO tags (name) VALUES ( ? )`
-      )!.run( query.name );
+      let res: Database.RunResult | null = null;
+      try {
+        res = this.storage[query.instanceId].db?.prepare(
+                `SELECT * FROM tags WHERE name = ?`)!.get( query.name );
+        if ( res === undefined ) {
+
+          res = this.storage[query.instanceId].db!.prepare(
+            `INSERT INTO tags (name) VALUES ( ? )`
+          )!.run( query.name );
+          if ( query.parentTagId !== null ) {
+            this.storage[query.instanceId].db!.prepare(
+              `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
+            ).run( query.parentTagId, res.lastInsertRowid );
+          }
+        }
+        return res;
+      }catch (e) { console.log(e); return null; }
     });
 
     ipcMain.handle('get-tag-tree', async (_, id) => {

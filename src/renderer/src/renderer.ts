@@ -522,6 +522,42 @@ export const CleePIX: {
         return ul;
       }
 
+      function createTreeItem(id: Number, name: string): [
+        li: HTMLLIElement, expansionButton: HTMLButtonElement,
+        tagNameButton: HTMLButtonElement, tagMenuButton: HTMLButtonElement
+      ] {
+
+        const li = document.createElement('li');
+        li.role = 'treeitem';
+        const buttonWrap = document.createElement('span');
+        buttonWrap.classList.add('for-hover');
+        const expansionButton = document.createElement('button');
+        const tagNameButton = document.createElement('button');
+        const tagMenuButton = document.createElement('button')
+
+        expansionButton.classList.add('expansion');
+        expansionButton.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+        expansionButton.dataset.opend = 'false';
+        expansionButton.dataset.tagId = `${id}`;
+
+        tagNameButton.classList.add('tag-name')
+        tagNameButton.textContent = name;
+        tagNameButton.dataset.tagId = `${id}`;
+
+        tagMenuButton.classList.add('tag-menu-btn');
+        tagMenuButton.hidden = true;
+        tagMenuButton.dataset.tagId = `${id}`;
+        tagMenuButton.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+        tagMenuButton.ariaLabel = 'このタグのメニューを開く';
+
+        buttonWrap.append(expansionButton);
+        buttonWrap.append(tagNameButton);
+        buttonWrap.append(tagMenuButton);
+        li.append(buttonWrap);
+
+        return [li, expansionButton, tagNameButton, tagMenuButton];
+      }
+
       const getTagTree = async (target: HTMLLIElement | null, id: number): Promise<{ [key: string]: HTMLButtonElement[] | HTMLUListElement[] | null }> => {
 
         return new Promise(async (resolve) => {
@@ -547,37 +583,15 @@ export const CleePIX: {
           if (treeItems.length !== 0) {
             treeItems.forEach(tag => {
 
-              const li = document.createElement('li');
-              li.role = 'treeitem';
-              const buttonWrap = document.createElement('span');
-              buttonWrap.classList.add('for-hover');
-              const expansionButton = document.createElement('button');
-              const tagNameButton = document.createElement('button');
-              const tagMenuButton = document.createElement('button')
+              const [
+                li, expansionButton, tagNameButton, tagMenuButton
+              ] = createTreeItem(Number(tag.id), tag.name);
 
-              expansionButton.classList.add('expansion');
-              expansionButton.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-              expansionButton.dataset.opend = 'false';
-              expansionButton.dataset.tagId = tag.id;
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
-
-              tagNameButton.classList.add('tag-name')
-              tagNameButton.textContent = tag.name;
-              tagNameButton.dataset.tagId = tag.id;
-
-              tagMenuButton.classList.add('tag-menu-btn');
-              tagMenuButton.hidden = true;
-              tagMenuButton.dataset.tagId = tag.id;
-              tagMenuButton.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
-              tagMenuButton.ariaLabel = 'このタグのメニューを開く';
 
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
               tagMenuButtonList.push(tagMenuButton);
-              buttonWrap.append(expansionButton);
-              buttonWrap.append(tagNameButton);
-              buttonWrap.append(tagMenuButton);
-              li.append(buttonWrap);
               ul.append(li);
             });
           } else {
@@ -621,30 +635,55 @@ export const CleePIX: {
         });
       }
 
-      function insertNewTag(targeUl: HTMLUListElement | null = null, tagId: number | null = null): void {
+      function insertNewTag(targetUl: HTMLUListElement | null = null, tagId: number | null = null): void {
 
         const li = document.createElement('li');
         const form = document.createElement('form');
         const input = document.createElement('input');
+
+        if (targetUl === null) targetUl = CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
 
         li.role = 'treeitem';
         form.classList.add('insert-tag-form');
         form.addEventListener('submit', e => { e.preventDefault() });
         form.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
         input.type = 'text';
-        input.addEventListener('keydown', (e) => {
+        input.addEventListener('keydown', async (e) => {
           if (e.code === 'Enter' && e.isComposing === false) {
-            li.remove();
+            window.electron.ipcRenderer
+              .invoke('add-tag', {
+                instanceId: CleePIX.currentInstanceId,
+                name: input.value, parentTagId: tagId
+              }).then(res => {
+                if (res !== null) {
+                  const tagId = res.id !== undefined ? res.id : res.lastInsertRowid;
+                  const [
+                    insertLi, expansionButton, tagNameButton, tagMenuButton
+                  ] = createTreeItem(tagId, input.value);
+                  expansionButton.dataset.loaded = 'false';
+                  setTagEvent({
+                    expansionButtonList: [expansionButton],
+                    tagNameButtonList: [tagNameButton],
+                    tagMenuButtonList: [tagMenuButton]
+                  });
+                  targetUl?.insertAdjacentElement('beforeend', insertLi);
+                  if ( targetUl!.childElementCount <= 3 ) {
+                    targetUl!.querySelector('li > button[data-tag-id="none"]')
+                      ?.parentElement?.remove();
+                  }
+                  li.remove();
+                }
+              });
           }
         });
         input.addEventListener('keyup', async (e) => {
           if (
             e.isComposing === false && input.value !== '' &&
             e.code !== 'Backspace' && e.code !== 'ArrowLeft' && e.code !== 'ArrowRight'
-            ) {
+          ) {
             const suggest = await window.electron.ipcRenderer
               .invoke('add-tag-suggest', { id: CleePIX.currentInstanceId, value: input.value });
-            if ( suggest !== undefined ) {
+            if (suggest !== undefined) {
               const strlen = input.value.length;
               input.value = suggest.name;
               input.selectionStart = strlen;
@@ -658,11 +697,7 @@ export const CleePIX: {
         form.append(input);
         li.append(form);
 
-        if (targeUl === null || tagId === null) {
-          CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].append(li);
-        } else {
-          targeUl.append(li);
-        }
+        targetUl.insertAdjacentElement('afterbegin', li);
 
         input.focus();
       }
