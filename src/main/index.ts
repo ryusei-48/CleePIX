@@ -5,6 +5,7 @@ import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
+//import { parseByPath } from "bookmark-file-parser";
 
 export type storeConfig = { instance?: { label: string, id: number, path: string }[] }
 
@@ -44,6 +45,9 @@ const CleePIXMain: {
     this.config.store.instance!.forEach(db => {
       this.initializeDB(db);
     });
+
+    //const bookmarks = parseByPath('./お気に入り_2023_04_03.html');
+    //console.log(bookmarks);
 
     app.whenReady().then(() => {
 
@@ -149,20 +153,35 @@ const CleePIXMain: {
 
     ipcMain.handle('add-tag', ( _, query ) => {
       let res: Database.RunResult | null = null;
+      let child_id: number | bigint = 0;
       try {
         res = this.storage[query.instanceId].db?.prepare(
                 `SELECT * FROM tags WHERE name = ?`)!.get( query.name );
+        child_id = res === undefined ? 0 : (<any>res!).id;
         if ( res === undefined ) {
 
           res = this.storage[query.instanceId].db!.prepare(
             `INSERT INTO tags (name) VALUES ( ? )`
           )!.run( query.name );
-          if ( query.parentTagId !== null ) {
-            this.storage[query.instanceId].db!.prepare(
-              `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
-            ).run( query.parentTagId, res.lastInsertRowid );
-          }
+          child_id = res!.lastInsertRowid;
         }
+        this.storage[query.instanceId].db!.prepare(
+          `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
+        ).run( query.parentTagId !== null ? query.parentTagId : 0, child_id );
+        return res;
+      }catch (e) { console.log(e); return null; }
+    });
+
+    ipcMain.handle('update-tag-name', ( _, query ) => {
+      let res: Database.RunResult | null = null;
+      try {
+        res = this.storage[query.instanceId].db?.prepare(
+          `SELECT * FROM tags WHERE name = ?`)!.get( query.name );
+        if ( res === undefined ) {
+          res = this.storage[query.instanceId].db!.prepare(
+            `UPDATE tags SET name = ? WHERE id = ?`)!.run( query.name, query.tagId );
+        }
+        console.log(query);
         return res;
       }catch (e) { console.log(e); return null; }
     });
@@ -171,12 +190,14 @@ const CleePIXMain: {
       let res: null | any[], editres: any[] = [];
       try {
         res = this.storage[id].db?.prepare(`SELECT * FROM tags`)!.all()!;
-        const isParentQuery = this.storage[id].db?.prepare(`SELECT * FROM tags_structure WHERE child_id = ?`);
+        const isParentQuery = this.storage[id].db?.prepare(`SELECT * FROM tags_structure WHERE parent_id = ?`);
+        const isHit = isParentQuery?.all( 0 )!;
         res.forEach( ( tag ) => {
-          const isHit = isParentQuery?.all( tag.id )!;
-          if ( isHit.length === 0 ) {
-            editres.push( tag );
-          }
+          isHit.forEach( hit => {
+            if ( tag.id === hit.child_id ) {
+              editres.push( tag );
+            }
+          });
         });
       } catch (e) { res = null }
       return editres;
@@ -239,8 +260,7 @@ const CleePIXMain: {
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags_structure" (
               "parent_id"	INTEGER NOT NULL, "child_id"	INTEGER NOT NULL,
-              FOREIGN KEY("parent_id") REFERENCES "tags"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-              FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+              FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE CASCADE,
               PRIMARY KEY("parent_id", "child_id")
             )`
       ).run();
@@ -255,6 +275,12 @@ const CleePIXMain: {
           `INSERT INTO tags (name) VALUES ( ? )`
         ).run(word);
       });
+
+      for (let i = 1; i <= 10; i++) {
+        this.storage[storage.id].db!.prepare(
+          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
+        ).run( 0, i );
+      }
 
       for (let i = 11; i <= 18; i++) {
         this.storage[storage.id].db!.prepare(

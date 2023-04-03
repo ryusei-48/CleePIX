@@ -341,11 +341,27 @@ main {
           overflow: scroll;
           li {
             //padding: 2px 10px;
+            position: relative;
             white-space: nowrap;
             form.insert-tag-form {
               display: block;
               width: 100%;
               padding-left: 10px;
+              input[type="text"] {
+                width: 80%;
+                padding: 5px;
+                margin-left: 13px;
+                font-size: 11pt;
+              }
+            }
+            form.update-tag-form {
+              position: absolute;
+              display: block;
+              top: 0; left: 0;
+              width: 100%;
+              padding-left: 10px;
+              background-color: $bg-color; // 0f0f0f
+              z-index: 3;
               input[type="text"] {
                 width: 80%;
                 padding: 5px;

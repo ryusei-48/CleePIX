@@ -4,7 +4,6 @@ import "../../../node_modules/quill/dist/quill.snow.css";
 import Quill from "quill";
 import "../../preload/index.d";
 import { includeDom } from "./include.dom";
-import { resolve } from "path";
 
 declare global {
   interface WindowEventMap {
@@ -467,11 +466,11 @@ export const CleePIX: {
               li.tabIndex = 0;
               li.role = 'button';
 
+              const targetLi = <HTMLLIElement>target.tagNameButtonList[index].parentNode?.parentNode;
+              let subUl = targetLi.querySelector<HTMLUListElement>('ul.tag-tree');
               switch (item.class) {
                 case 'add-new-tag':
                   li.addEventListener('click', async () => {
-                    const targetLi = <HTMLLIElement>target.tagNameButtonList[index].parentNode?.parentNode;
-                    let subUl = targetLi.querySelector<HTMLUListElement>('ul.tag-tree');
                     if (subUl === null) {
                       await getTagTree(targetLi, Number(button.dataset.tagId));
                       subUl = targetLi.querySelector<HTMLUListElement>('ul.tag-tree.sub')!;
@@ -482,6 +481,13 @@ export const CleePIX: {
                       subUl.hidden = false;
                     }
                     insertNewTag(subUl, Number(button.dataset.tagId));
+                    showMenuDomWrap.hidden = true;
+                    showMenuDom.hidden = true;
+                  });
+                  break;
+                case 'name-change':
+                  li.addEventListener('click', () => {
+                    insertNewTag(subUl, Number(button.dataset.tagId), true, targetLi);
                     showMenuDomWrap.hidden = true;
                     showMenuDom.hidden = true;
                   });
@@ -589,6 +595,16 @@ export const CleePIX: {
 
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
+              if ( isRoot === false ) {
+                const clickTagNameButton = target?.querySelector<HTMLButtonElement>('button.tag-name')!;
+                tagNameButton.dataset.tagChain =
+                  (clickTagNameButton.dataset.tagChain + ',' + id + ',').replace(/^,|,$/g, '');
+                tagNameButton.dataset.parentTagId = `${ id }`;
+              }else {
+                tagNameButton.dataset.tagChain = '';
+                tagNameButton.dataset.parentTagId = '0';
+              }
+
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
               tagMenuButtonList.push(tagMenuButton);
@@ -635,45 +651,82 @@ export const CleePIX: {
         });
       }
 
-      function insertNewTag(targetUl: HTMLUListElement | null = null, tagId: number | null = null): void {
+      function createTagForm( isUpdate: boolean = false ): [li: HTMLLIElement, form: HTMLFormElement, input: HTMLInputElement] {
 
         const li = document.createElement('li');
         const form = document.createElement('form');
         const input = document.createElement('input');
 
-        if (targetUl === null) targetUl = CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
-
         li.role = 'treeitem';
-        form.classList.add('insert-tag-form');
+        isUpdate === false ? form.classList.add('insert-tag-form') : form.classList.add('update-tag-form');
         form.addEventListener('submit', e => { e.preventDefault() });
         form.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
         input.type = 'text';
+
+        form.append(input);
+        li.append(form);
+
+        return [li, form, input];
+      }
+
+      function insertNewTag(targetUl: HTMLUListElement | null = null,
+        tagId: number | null = null, isUpdate: boolean = false, targetLi?: HTMLLIElement): void {
+
+        const [li, form, input] = createTagForm( isUpdate );
+
+        if (targetUl === null) targetUl = CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
+
         input.addEventListener('keydown', async (e) => {
           if (e.code === 'Enter' && e.isComposing === false) {
-            window.electron.ipcRenderer
-              .invoke('add-tag', {
-                instanceId: CleePIX.currentInstanceId,
-                name: input.value, parentTagId: tagId
-              }).then(res => {
-                if (res !== null) {
-                  const tagId = res.id !== undefined ? res.id : res.lastInsertRowid;
-                  const [
-                    insertLi, expansionButton, tagNameButton, tagMenuButton
-                  ] = createTreeItem(tagId, input.value);
-                  expansionButton.dataset.loaded = 'false';
-                  setTagEvent({
-                    expansionButtonList: [expansionButton],
-                    tagNameButtonList: [tagNameButton],
-                    tagMenuButtonList: [tagMenuButton]
-                  });
-                  targetUl?.insertAdjacentElement('beforeend', insertLi);
-                  if ( targetUl!.childElementCount <= 3 ) {
-                    targetUl!.querySelector('li > button[data-tag-id="none"]')
-                      ?.parentElement?.remove();
+            if (isUpdate === false) {
+              let isHitTagName: boolean = false;
+              [...targetUl!.querySelectorAll(`button.tag-name[data-parent-tag-id='${ tagId === null ? 0 : tagId }']`)]
+                .forEach( tagNameButton => {
+                  if ( tagNameButton.textContent === input.value ) {
+                    isHitTagName = true; return;
                   }
-                  li.remove();
-                }
-              });
+                });
+              if ( isHitTagName !== false ) return;
+              window.electron.ipcRenderer
+                .invoke('add-tag', {
+                  instanceId: CleePIX.currentInstanceId,
+                  name: input.value, parentTagId: tagId
+                }).then(res => {
+                  if (res !== null) {
+                    const tagId = res.id !== undefined ? res.id : res.lastInsertRowid;
+                    const [
+                      insertLi, expansionButton, tagNameButton, tagMenuButton
+                    ] = createTreeItem(tagId, input.value);
+                    expansionButton.dataset.loaded = 'false';
+                    setTagEvent({
+                      expansionButtonList: [expansionButton],
+                      tagNameButtonList: [tagNameButton],
+                      tagMenuButtonList: [tagMenuButton]
+                    });
+                    targetUl?.insertAdjacentElement('beforeend', insertLi);
+                    if (targetUl!.childElementCount <= 3) {
+                      targetUl!.querySelector('li > button[data-tag-id="none"]')
+                        ?.parentElement?.remove();
+                    }
+                    li.remove();
+                  }
+                });
+            }else {
+              window.electron.ipcRenderer
+                .invoke('update-tag-name', {
+                  instanceId: CleePIX.currentInstanceId,
+                  name: input.value, tagId: tagId
+                }).then( res => {
+                  if ( res !== null ) {
+                    const tagNameButton = targetLi?.querySelector('button.tag-name')!;
+                    tagNameButton.textContent = input.value;
+                    [...CleePIX.liveDom.tagTreePanel[ CleePIX.currentInstanceId ]
+                      .querySelectorAll(`button.tag-name[data-tag-id='${ tagId }']`)]
+                      .forEach( tagNameButton => { tagNameButton.textContent = input.value; });
+                    form.remove();
+                  }
+                });
+            }
           }
         });
         input.addEventListener('keyup', async (e) => {
@@ -692,12 +745,19 @@ export const CleePIX: {
             }
           }
         });
-        input.addEventListener('focusout', () => { li.remove() });
+        input.addEventListener('focusout', () => {
+          if ( isUpdate === false ) {
+            li.remove();
+          }else form.remove();
+        });
 
-        form.append(input);
-        li.append(form);
-
-        targetUl.insertAdjacentElement('afterbegin', li);
+        if ( isUpdate === false ) {
+          targetUl.insertAdjacentElement('afterbegin', li);
+        }else {
+          const tagName = targetLi?.querySelector('button.tag-name')?.textContent;
+          input.value = tagName!;
+          targetLi?.append(form);
+        }
 
         input.focus();
       }
