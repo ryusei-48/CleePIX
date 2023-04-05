@@ -94,6 +94,15 @@ export const CleePIX: {
       this.instanceDBs = ites;
       //window.dispatchEvent(new CustomEvent('ite_change', { detail: CleePIX.currentInstanceId }));
     });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.altKey && e.code === 'KeyL') {
+        window.electron.ipcRenderer.invoke('bookmark-file')
+          .then(data => {
+            console.log(data);
+          });
+      }
+    });
   },
 
   instancePanelControl: {
@@ -207,8 +216,33 @@ export const CleePIX: {
 
       this.commonModalWindow(
         '#show-bookmark-modal-btn', CleePIX.liveDom.addBookmark,
-        '.add-bookmark-modal-wrap', '#add-bookmark-title'
+        '.add-bookmark-modal-wrap', '#add-bookmark-url'
       );
+
+      const urlInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-url')!;
+      const titleInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-title')!;
+      const descriptionInput = CleePIX.liveDom.addBookmark.querySelector<HTMLTextAreaElement>('#add-bookmark-description')!;
+      const thumbPreview = CleePIX.liveDom.addBookmark.querySelector<HTMLDivElement>('div.view-thumb')!;
+      const noThumbElement = <HTMLSpanElement>(thumbPreview.childNodes)[0];
+      urlInput.addEventListener('change', (e) => {
+        const url = (<HTMLInputElement>e.target).value;
+        window.electron.ipcRenderer
+          .invoke('get-http-request', url)
+          .then(response => {
+            if (response !== null) {
+              titleInput.value = response.title;
+              descriptionInput.textContent = response.description.replace(/ |　/g, '');
+
+              thumbPreview.innerHTML = '';
+              if (response.image !== undefined) {
+                const img = document.createElement('img');
+                img.src = response.image;
+                img.alt = 'サムネイル画像のプレビュー';
+                thumbPreview.append(img);
+              } else thumbPreview.append(noThumbElement);
+            }
+          });
+      });
 
       CleePIX.liveDom.instancePanel.insertAdjacentElement('afterend', CleePIX.liveDom.addBookmark);
     },
@@ -595,12 +629,12 @@ export const CleePIX: {
 
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
-              if ( isRoot === false ) {
+              if (isRoot === false) {
                 const clickTagNameButton = target?.querySelector<HTMLButtonElement>('button.tag-name')!;
                 tagNameButton.dataset.tagChain =
                   (clickTagNameButton.dataset.tagChain + ',' + id + ',').replace(/^,|,$/g, '');
-                tagNameButton.dataset.parentTagId = `${ id }`;
-              }else {
+                tagNameButton.dataset.parentTagId = `${id}`;
+              } else {
                 tagNameButton.dataset.tagChain = '';
                 tagNameButton.dataset.parentTagId = '0';
               }
@@ -651,7 +685,7 @@ export const CleePIX: {
         });
       }
 
-      function createTagForm( isUpdate: boolean = false ): [li: HTMLLIElement, form: HTMLFormElement, input: HTMLInputElement] {
+      function createTagForm(isUpdate: boolean = false): [li: HTMLLIElement, form: HTMLFormElement, input: HTMLInputElement] {
 
         const li = document.createElement('li');
         const form = document.createElement('form');
@@ -672,7 +706,7 @@ export const CleePIX: {
       function insertNewTag(targetUl: HTMLUListElement | null = null,
         tagId: number | null = null, isUpdate: boolean = false, targetLi?: HTMLLIElement): void {
 
-        const [li, form, input] = createTagForm( isUpdate );
+        const [li, form, input] = createTagForm(isUpdate);
 
         if (targetUl === null) targetUl = CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
 
@@ -680,13 +714,13 @@ export const CleePIX: {
           if (e.code === 'Enter' && e.isComposing === false) {
             if (isUpdate === false) {
               let isHitTagName: boolean = false;
-              [...targetUl!.querySelectorAll(`button.tag-name[data-parent-tag-id='${ tagId === null ? 0 : tagId }']`)]
-                .forEach( tagNameButton => {
-                  if ( tagNameButton.textContent === input.value ) {
+              [...targetUl!.querySelectorAll(`button.tag-name[data-parent-tag-id='${tagId === null ? 0 : tagId}']`)]
+                .forEach(tagNameButton => {
+                  if (tagNameButton.textContent === input.value) {
                     isHitTagName = true; return;
                   }
                 });
-              if ( isHitTagName !== false ) return;
+              if (isHitTagName !== false) return;
               window.electron.ipcRenderer
                 .invoke('add-tag', {
                   instanceId: CleePIX.currentInstanceId,
@@ -711,18 +745,18 @@ export const CleePIX: {
                     li.remove();
                   }
                 });
-            }else {
+            } else {
               window.electron.ipcRenderer
                 .invoke('update-tag-name', {
                   instanceId: CleePIX.currentInstanceId,
                   name: input.value, tagId: tagId
-                }).then( res => {
-                  if ( res !== null ) {
+                }).then(res => {
+                  if (res !== null) {
                     const tagNameButton = targetLi?.querySelector('button.tag-name')!;
                     tagNameButton.textContent = input.value;
-                    [...CleePIX.liveDom.tagTreePanel[ CleePIX.currentInstanceId ]
-                      .querySelectorAll(`button.tag-name[data-tag-id='${ tagId }']`)]
-                      .forEach( tagNameButton => { tagNameButton.textContent = input.value; });
+                    [...CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId]
+                      .querySelectorAll(`button.tag-name[data-tag-id='${tagId}']`)]
+                      .forEach(tagNameButton => { tagNameButton.textContent = input.value; });
                     form.remove();
                   }
                 });
@@ -746,14 +780,14 @@ export const CleePIX: {
           }
         });
         input.addEventListener('focusout', () => {
-          if ( isUpdate === false ) {
+          if (isUpdate === false) {
             li.remove();
-          }else form.remove();
+          } else form.remove();
         });
 
-        if ( isUpdate === false ) {
+        if (isUpdate === false) {
           targetUl.insertAdjacentElement('afterbegin', li);
-        }else {
+        } else {
           const tagName = targetLi?.querySelector('button.tag-name')?.textContent;
           input.value = tagName!;
           targetLi?.append(form);

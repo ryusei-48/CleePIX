@@ -5,7 +5,8 @@ import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
-//import { parseByPath } from "bookmark-file-parser";
+import * as cheerio from 'cheerio';
+import { parseByPath } from "bookmark-file-parser";
 
 export type storeConfig = { instance?: { label: string, id: number, path: string }[] }
 
@@ -46,9 +47,6 @@ const CleePIXMain: {
       this.initializeDB(db);
     });
 
-    //const bookmarks = parseByPath('./お気に入り_2023_04_03.html');
-    //console.log(bookmarks);
-
     app.whenReady().then(() => {
 
       this.Windows.main = this.createWindowInstance();
@@ -62,6 +60,11 @@ const CleePIXMain: {
 
     ipcMain.handle('get-instance-db', () => {
       return this.config.store.instance;
+    });
+
+    ipcMain.handle('bookmark-file', () => {
+      const bookmarks = parseByPath('./お気に入り_2023_04_03.html');
+      return bookmarks;
     });
 
     ipcMain.on('window-close', () => {
@@ -214,6 +217,25 @@ const CleePIXMain: {
       })
       return tagsRes;
     });
+
+    ipcMain.handle('get-http-request', async ( _, url ) => {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'no-cors',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
+        }
+      });
+      if (response && response.ok) {
+        const $ = cheerio.load(await response.text());
+        let description = $(`meta[property="og:description"]`).attr('content');
+        if ( description === undefined ) description = $(`meta[name="description"]`).attr('content');
+        return {
+          title: $('title').text(), description,
+          image: $(`meta[property='og:image']`).attr('content')
+        }
+      }else return null;
+    });
   },
 
   initializeDB: function (storage) {
@@ -231,38 +253,38 @@ const CleePIXMain: {
       //this.storage.main.pragma("key='ymzkrk33'");
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "bookmarks" (
-              "id"	INTEGER NOT NULL UNIQUE, "type"	TEXT NOT NULL,
-              "title"	TEXT NOT NULL, "description"	TEXT,
-              "data"	TEXT NOT NULL, "thunb"	TEXT NOT NULL,
-              "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              PRIMARY KEY("id" AUTOINCREMENT)
-            )`
+          "id"	INTEGER NOT NULL UNIQUE, "type"	TEXT NOT NULL,
+          "title"	TEXT NOT NULL, "description"	TEXT,
+          "data"	TEXT NOT NULL, "thunb"	TEXT NOT NULL,
+          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
       ).run();
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags" (
-              "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
-              "font_color"	TEXT NOT NULL DEFAULT '#c6c4be',
-              "bg_color"	TEXT NOT NULL DEFAULT 'gray',
-              "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              PRIMARY KEY("id" AUTOINCREMENT)
-            )`
+          "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
+          "font_color"	TEXT NOT NULL DEFAULT '#c6c4be',
+          "bg_color"	TEXT NOT NULL DEFAULT 'gray',
+          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
       ).run();
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags_bookmarks" (
-              "tags_id"	INTEGER NOT NULL, "bookmark_id"	INTEGER NOT NULL,
-              FOREIGN KEY("bookmark_id") REFERENCES "bookmarks"("id") on delete cascade,
-              FOREIGN KEY("tags_id") REFERENCES "tags"("id") on delete cascade,
-              PRIMARY KEY("tags_id","bookmark_id")
-            )`
+          "tags_id"	INTEGER NOT NULL, "bookmark_id"	INTEGER NOT NULL,
+          FOREIGN KEY("bookmark_id") REFERENCES "bookmarks"("id") on delete cascade,
+          FOREIGN KEY("tags_id") REFERENCES "tags"("id") on delete cascade,
+          PRIMARY KEY("tags_id","bookmark_id")
+        )`
       ).run();
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags_structure" (
-              "parent_id"	INTEGER NOT NULL, "child_id"	INTEGER NOT NULL,
-              FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE CASCADE,
-              PRIMARY KEY("parent_id", "child_id")
-            )`
+          "parent_id"	INTEGER NOT NULL, "child_id"	INTEGER NOT NULL,
+          FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE CASCADE,
+          PRIMARY KEY("parent_id", "child_id")
+        )`
       ).run();
 
       [
