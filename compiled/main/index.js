@@ -30846,7 +30846,8 @@ const CleePIXMain = {
           label: "main",
           id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
-        }]
+        }],
+        cache: { currentInstanceId: 1, tagTreeDomString: null }
       };
     }
     this.configTemp = this.config.store;
@@ -30860,8 +30861,8 @@ const CleePIXMain = {
           CleePIXMain.createWindowInstance();
       });
     });
-    electron.ipcMain.handle("get-instance-db", () => {
-      return this.config.store.instance;
+    electron.ipcMain.handle("get-config", () => {
+      return this.config.store;
     });
     electron.ipcMain.handle("bookmark-file", () => {
       const bookmarks = lib$2.parseByPath("./お気に入り_2023_04_03.html");
@@ -30975,7 +30976,6 @@ const CleePIXMain = {
             `UPDATE tags SET name = ? WHERE id = ?`
           ).run(query.name, query.tagId);
         }
-        console.log(query);
         return res;
       } catch (e) {
         console.log(e);
@@ -31009,6 +31009,23 @@ const CleePIXMain = {
       });
       return tagsRes;
     });
+    electron.ipcMain.handle("update-tag-structure", (_2, structure) => {
+      try {
+        const delRes = this.storage[structure.instanceId].db.prepare(
+          `DELETE FROM tags_structure WHERE parent_id = ? AND child_id = ?`
+        ).run(structure.delete.parentId, structure.delete.childId);
+        const setRes = this.storage[structure.instanceId].db.prepare(
+          `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
+        ).run(structure.set.parentId, structure.set.childId);
+        if (delRes.changes === 1 && setRes.changes === 1) {
+          return true;
+        } else
+          return false;
+      } catch (e) {
+        console.log(e);
+        return false;
+      }
+    });
     electron.ipcMain.handle("get-http-request", async (_2, url) => {
       const response = await fetch(url, {
         method: "GET",
@@ -31022,9 +31039,6 @@ const CleePIXMain = {
         let description2 = $2(`meta[property="og:description"]`).attr("content");
         if (description2 === void 0)
           description2 = $2(`meta[name="description"]`).attr("content");
-        $2(`meta`).filter('meta[name="description"]').each((_22, element2) => {
-          console.log(element2.attribs);
-        });
         return {
           title: $2("title").text(),
           description: description2,
@@ -31045,38 +31059,38 @@ const CleePIXMain = {
       this.storage[storage.id].db = new Database(storage.path);
       this.storage[storage.id].db.prepare(
         `CREATE TABLE "bookmarks" (
-              "id"	INTEGER NOT NULL UNIQUE, "type"	TEXT NOT NULL,
-              "title"	TEXT NOT NULL, "description"	TEXT,
-              "data"	TEXT NOT NULL, "thunb"	TEXT NOT NULL,
-              "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              PRIMARY KEY("id" AUTOINCREMENT)
-            )`
+          "id"	INTEGER NOT NULL UNIQUE, "type"	TEXT NOT NULL,
+          "title"	TEXT NOT NULL, "description"	TEXT,
+          "data"	TEXT NOT NULL, "thunb"	TEXT NOT NULL,
+          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
       ).run();
       this.storage[storage.id].db.prepare(
         `CREATE TABLE "tags" (
-              "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
-              "font_color"	TEXT NOT NULL DEFAULT '#c6c4be',
-              "bg_color"	TEXT NOT NULL DEFAULT 'gray',
-              "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-              PRIMARY KEY("id" AUTOINCREMENT)
-            )`
+          "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
+          "font_color"	TEXT NOT NULL DEFAULT '#c6c4be',
+          "bg_color"	TEXT NOT NULL DEFAULT 'gray',
+          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
       ).run();
       this.storage[storage.id].db.prepare(
         `CREATE TABLE "tags_bookmarks" (
-              "tags_id"	INTEGER NOT NULL, "bookmark_id"	INTEGER NOT NULL,
-              FOREIGN KEY("bookmark_id") REFERENCES "bookmarks"("id") on delete cascade,
-              FOREIGN KEY("tags_id") REFERENCES "tags"("id") on delete cascade,
-              PRIMARY KEY("tags_id","bookmark_id")
-            )`
+          "tags_id"	INTEGER NOT NULL, "bookmark_id"	INTEGER NOT NULL,
+          FOREIGN KEY("bookmark_id") REFERENCES "bookmarks"("id") on delete cascade,
+          FOREIGN KEY("tags_id") REFERENCES "tags"("id") on delete cascade,
+          PRIMARY KEY("tags_id","bookmark_id")
+        )`
       ).run();
       this.storage[storage.id].db.prepare(
         `CREATE TABLE "tags_structure" (
-              "parent_id"	INTEGER NOT NULL, "child_id"	INTEGER NOT NULL,
-              FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE CASCADE,
-              PRIMARY KEY("parent_id", "child_id")
-            )`
+          "parent_id"	INTEGER NOT NULL, "child_id"	INTEGER NOT NULL,
+          FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE CASCADE,
+          PRIMARY KEY("parent_id", "child_id")
+        )`
       ).run();
       [
         "プログラミング",

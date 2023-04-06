@@ -339,10 +339,12 @@ main {
           max-height: 100%;
           width: 100%;
           overflow: scroll;
+          transition: all .3s;
           li {
             //padding: 2px 10px;
             position: relative;
             white-space: nowrap;
+            border-top: 1px solid transparent;
             form.insert-tag-form {
               display: block;
               width: 100%;
@@ -403,13 +405,21 @@ main {
           }
         }
         ul.tag-tree.sub {
-          position: unset;
+          position: relative;
           top: unset;
           left: unset;
           max-height: unset;
           overflow: unset;
-          padding-left: 15px;
+          padding-left: 18px;
           list-style: none;
+          &::before {
+            position: absolute;
+            content: "";
+            top: 0; left: 17px;
+            width: 1px;
+            height: 100%;
+            background-color: rgb(88, 88, 88);
+          }
         }
       }
       .resize-panel-bar {

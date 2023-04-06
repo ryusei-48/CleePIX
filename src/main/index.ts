@@ -8,7 +8,10 @@ import Database from "better-sqlite3-multiple-ciphers";
 import * as cheerio from 'cheerio';
 import { parseByPath } from "bookmark-file-parser";
 
-export type storeConfig = { instance?: { label: string, id: number, path: string }[] }
+export type storeConfig = {
+  instance?: { label: string, id: number, path: string }[],
+  cache: { currentInstanceId: number, tagTreeDomString: string | null }
+}
 
 const USER_DATA_PATH = app.getPath('userData');
 const STORAGE_PATH = USER_DATA_PATH + '/storage/database';
@@ -37,7 +40,8 @@ const CleePIXMain: {
         }, {
           label: 'main', id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
-        }]
+        }],
+        cache: { currentInstanceId: 1, tagTreeDomString: null }
       }
     }
 
@@ -58,8 +62,8 @@ const CleePIXMain: {
       });
     });
 
-    ipcMain.handle('get-instance-db', () => {
-      return this.config.store.instance;
+    ipcMain.handle('get-config', () => {
+      return this.config.store;
     });
 
     ipcMain.handle('bookmark-file', () => {
@@ -184,7 +188,6 @@ const CleePIXMain: {
           res = this.storage[query.instanceId].db!.prepare(
             `UPDATE tags SET name = ? WHERE id = ?`)!.run( query.name, query.tagId );
         }
-        console.log(query);
         return res;
       }catch (e) { console.log(e); return null; }
     });
@@ -216,6 +219,20 @@ const CleePIXMain: {
         tagsRes.push( tags?.get( structure.child_id ) );
       })
       return tagsRes;
+    });
+
+    ipcMain.handle('update-tag-structure', ( _, structure ) => {
+      try {
+        const delRes = this.storage[structure.instanceId].db!.prepare(
+          `DELETE FROM tags_structure WHERE parent_id = ? AND child_id = ?`
+        ).run( structure.delete.parentId, structure.delete.childId );
+        const setRes = this.storage[structure.instanceId].db!.prepare(
+          `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
+        ).run( structure.set.parentId, structure.set.childId );
+        if ( delRes.changes === 1 && setRes.changes === 1 ) {
+          return true;
+        }else return false;
+      } catch (e) { console.log(e); return false; }
     });
 
     ipcMain.handle('get-http-request', async ( _, url ) => {

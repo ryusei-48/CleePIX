@@ -46,26 +46,26 @@ export const CleePIX: {
     tagTreePanel: {}
   },
 
-  init: function () {
+  init: async function () {
 
-    window.electron.ipcRenderer.invoke('get-instance-db').then(dbs => {
+    const config = await window.electron.ipcRenderer.invoke('get-config');
 
-      this.instanceDBs = dbs;
-      this.windowControl();
-      this.instancePanelControl.addInstance();
-      this.instancePanelControl.addBookmark();
-      this.instancePanelControl.addRssFeed();
-      this.instancePanelControl.addText();
-      this.instancePanelControl.addTagBlock();
-      this.instancePanelControl.tagTreePanel();
+    this.instanceDBs = config.instance;
+    this.currentInstanceId = config.cache.currentInstanceId;
 
-      const script = document.createElement('script');
-      //script.src = "https://platform.twitter.com/widgets.js";
-      script.type = 'application/javascript';
-      script.src = 'https://embed.nicovideo.jp/watch/sm41943302/script?w=640&h=360';
-      document.body.appendChild(script);
+    this.windowControl();
+    this.instancePanelControl.addInstance();
+    this.instancePanelControl.addBookmark();
+    this.instancePanelControl.addRssFeed();
+    this.instancePanelControl.addText();
+    this.instancePanelControl.addTagBlock();
+    this.instancePanelControl.tagTreePanel();
 
-    });
+    const script = document.createElement('script');
+    //script.src = "https://platform.twitter.com/widgets.js";
+    script.type = 'application/javascript';
+    script.src = 'https://embed.nicovideo.jp/watch/sm41943302/script?w=640&h=360';
+    document.body.appendChild(script);
 
   },
 
@@ -198,7 +198,6 @@ export const CleePIX: {
       CleePIX.instanceDBs.forEach(db => {
         addInstanceLavel(db.label, `${db.id}`);
       });
-      CleePIX.currentInstanceId = 1;
 
       CleePIX.liveDom.addInstance
         .querySelector<HTMLButtonElement>('#add-instance-btn')
@@ -569,6 +568,69 @@ export const CleePIX: {
 
         const li = document.createElement('li');
         li.role = 'treeitem';
+        li.id = `item-tag-${id}`;
+        li.dataset.tagId = `${id}`;
+        li.draggable = true;
+        li.addEventListener('dragstart', (e) => {
+          e.dataTransfer!.setData('text/plain', (<HTMLLIElement>e.target).id);
+        });
+        li.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer!.dropEffect = 'move';
+          li.style.borderTop = '1px solid #cccccc';
+          li.parentElement!.style.backgroundColor = '#2d2d2d';
+        });
+        li.addEventListener('dragleave', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          li.style.borderTop = 'unset';
+          li.parentElement!.style.backgroundColor = 'unset';
+        });
+        li.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          li.style.borderTop = 'unset';
+
+          const ul = <HTMLUListElement>li.parentElement!;
+          ul.style.backgroundColor = 'unset';
+
+          let itemId: string = '';
+          if (e.dataTransfer!.items) {
+            for (const item of e.dataTransfer!.items) {
+              const { kind, type } = item
+              if (kind === 'file') {
+                // Do nothing - item is file
+              } else if (kind === 'string') {
+                if (type === 'text/plain') {
+                  itemId = e.dataTransfer!.getData(type)
+                }
+              }
+            }
+          }
+
+          if (itemId !== '') {
+            const rootUl = CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
+            const dragTarget = rootUl.querySelector<HTMLLIElement>(`#${itemId}`)!;
+            const dragTargetButton = dragTarget.querySelector<HTMLButtonElement>('button.tag-name')!;
+            const hitDragTarget = ul.querySelector<HTMLButtonElement>(`button[data-parent-tag-id="${dragTarget.dataset.parentTagId}"][data-tag-id="${dragTarget.dataset.tagId}"]`);
+            if (hitDragTarget === null) {
+              window.electron.ipcRenderer
+                .invoke('update-tag-structure', {
+                  instanceId: CleePIX.currentInstanceId,
+                  delete: { parentId: dragTarget.dataset.parentTagId, childId: dragTarget.dataset.tagId },
+                  set: { parentId: ul.dataset.parentTagId, childId: dragTarget.dataset.tagId }
+                }).then(res => {
+                  if (res === true) {
+                    dragTarget.dataset.parentTagId = ul.dataset.parentTagId;
+                    dragTargetButton.dataset.parentTagId = ul.dataset.parentTagId;
+                  }
+                });
+            }
+            ul.insertBefore(dragTarget, li);
+          }
+        });
+
         const buttonWrap = document.createElement('span');
         buttonWrap.classList.add('for-hover');
         const expansionButton = document.createElement('button');
@@ -630,13 +692,31 @@ export const CleePIX: {
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
               if (isRoot === false) {
+                //console.log('sub');
                 const clickTagNameButton = target?.querySelector<HTMLButtonElement>('button.tag-name')!;
                 tagNameButton.dataset.tagChain =
                   (clickTagNameButton.dataset.tagChain + ',' + id + ',').replace(/^,|,$/g, '');
                 tagNameButton.dataset.parentTagId = `${id}`;
+                li.dataset.parentTagId = `${id}`;
               } else {
+                //console.log('root');
                 tagNameButton.dataset.tagChain = '';
                 tagNameButton.dataset.parentTagId = '0';
+                li.dataset.parentTagId = '0';
+              }
+
+              if (isRoot === false) {
+                console.log('sub');
+                const clickTagNameButton = target?.querySelector<HTMLButtonElement>('button.tag-name')!;
+                tagNameButton.dataset.tagChain =
+                  (clickTagNameButton.dataset.tagChain + ',' + id + ',').replace(/^,|,$/g, '');
+                tagNameButton.dataset.parentTagId = `${id}`;
+                li.dataset.parentTagId = `${id}`;
+              } else {
+                console.log('root');
+                tagNameButton.dataset.tagChain = '';
+                tagNameButton.dataset.parentTagId = '0';
+                li.dataset.parentTagId = '0';
               }
 
               expansionButtonList.push(expansionButton);
@@ -657,6 +737,9 @@ export const CleePIX: {
             ul.append(li);
           }
 
+          ul.dataset.parentTagId = '0';
+          if (isRoot === true) ul.style.height = '100%';
+
           if (target === null) {
 
             if (CleePIX.currentInstanceId !== id) {
@@ -674,6 +757,7 @@ export const CleePIX: {
               .insertAdjacentElement('beforeend', ul);
           } else {
             ul.hidden = true;
+            ul.dataset.parentTagId = `${id}`;
             ul.classList.add('sub', 'animate__fadeInLeft');
             target.insertAdjacentElement('beforeend', ul);
             setTagEvent({
@@ -683,6 +767,23 @@ export const CleePIX: {
 
           resolve({ expansionButtonList, tagNameButtonList, tagMenuButtonList });
         });
+      }
+
+      function insertAttrTreeItem(
+        isRoot: boolean, parentTagId: number, targetLi: HTMLLIElement,
+        targetTagNameButton: HTMLButtonElement, readLi: HTMLLIElement
+      ) {
+        if (isRoot === false) {
+          const clickTagNameButton = readLi.querySelector<HTMLButtonElement>('button.tag-name')!;
+          targetTagNameButton.dataset.tagChain =
+            (clickTagNameButton.dataset.tagChain + ',' + parentTagId + ',').replace(/^,|,$/g, '');
+          targetTagNameButton.dataset.parentTagId = `${parentTagId}`;
+          targetLi.dataset.parentTagId = `${parentTagId}`;
+        } else {
+          targetTagNameButton.dataset.tagChain = '';
+          targetTagNameButton.dataset.parentTagId = '0';
+          targetLi.dataset.parentTagId = '0';
+        }
       }
 
       function createTagForm(isUpdate: boolean = false): [li: HTMLLIElement, form: HTMLFormElement, input: HTMLInputElement] {
@@ -708,6 +809,7 @@ export const CleePIX: {
 
         const [li, form, input] = createTagForm(isUpdate);
 
+        const isRoot = targetUl === null ? true : false;
         if (targetUl === null) targetUl = CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
 
         input.addEventListener('keydown', async (e) => {
@@ -727,16 +829,19 @@ export const CleePIX: {
                   name: input.value, parentTagId: tagId
                 }).then(res => {
                   if (res !== null) {
-                    const tagId = res.id !== undefined ? res.id : res.lastInsertRowid;
+                    const AddedTagId = res.id !== undefined ? res.id : res.lastInsertRowid;
                     const [
                       insertLi, expansionButton, tagNameButton, tagMenuButton
-                    ] = createTreeItem(tagId, input.value);
+                    ] = createTreeItem(AddedTagId, input.value);
                     expansionButton.dataset.loaded = 'false';
                     setTagEvent({
                       expansionButtonList: [expansionButton],
                       tagNameButtonList: [tagNameButton],
                       tagMenuButtonList: [tagMenuButton]
                     });
+                    const readLi = <HTMLLIElement>targetUl?.parentElement!;
+                    console.log(readLi.dataset.tagChain);
+                    insertAttrTreeItem(isRoot, tagId!, insertLi, tagNameButton, readLi)
                     targetUl?.insertAdjacentElement('beforeend', insertLi);
                     if (targetUl!.childElementCount <= 3) {
                       targetUl!.querySelector('li > button[data-tag-id="none"]')
