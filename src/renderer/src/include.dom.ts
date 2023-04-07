@@ -72,7 +72,7 @@ export const includeDom: {
         <span draggable="true" class="resize-panel-bar"></span>
         <div class="contents-panel">
           <!--<iframe style="width:100%;aspect-ratio:16 / 9;" src="https://etc.private.x-sv.com" title="爽快感・透明感が半端ない中毒性MAXのボカロ曲メドレー【全20曲】" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>-->
-          <iframe style="width:100%;aspect-ratio:16 / 9;" src="https://www.youtube.com/embed/cBsX1BiWshI" title="夢花火 / 百鬼あやめ original" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          <iframe style="width:100%;aspect-ratio:16 / 9;" src="https://www.youtube.com/embed/twlM59bD6kM" title="夢花火 / 百鬼あやめ original" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
           <!--<blockquote class="twitter-tweet" data-theme="dark"><p lang="en" dir="ltr">First Starlink v2 satellites reach orbit <a href="https://t.co/0l08568mJ9">pic.twitter.com/0l08568mJ9</a></p>&mdash; Elon Musk (@elonmusk) <a href="https://twitter.com/elonmusk/status/1630394434847227909?ref_src=twsrc%5Etfw">February 28, 2023</a></blockquote>-->
           <!--<webview id="foo" src="https://etc.private.x-sv.com" style="width:100%;aspect-ratio:16 / 9;"></webview>-->
           <!--<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>-->

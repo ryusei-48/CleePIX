@@ -13,7 +13,11 @@ declare global {
 
 export const CleePIX: {
 
-  init: () => void, currentInstanceId: number,
+  init: () => void, currentInstanceId: number, tagTreeDomString: string | null,
+  config: {
+    instance?: { label: string, id: number, path: string }[],
+    cache?: { currentInstanceId: number, tagTreeDomString: string | null }
+  },
   instanceDBs: { label: string, id: number, path: string }[],
   instanceLabels: string[], windowControl: () => void,
   instancePanelControl: {
@@ -35,7 +39,7 @@ export const CleePIX: {
 } = {
 
   currentInstanceId: 0, instanceLabels: ['default'],
-  instanceDBs: [],
+  instanceDBs: [], tagTreeDomString: null, config: {},
   liveDom: {
     base: includeDom.base(), instancePanel: includeDom.instancePanel(),
     addInstance: includeDom.addInstance(),
@@ -50,8 +54,10 @@ export const CleePIX: {
 
     const config = await window.electron.ipcRenderer.invoke('get-config');
 
+    this.config = config;
     this.instanceDBs = config.instance;
     this.currentInstanceId = config.cache.currentInstanceId;
+    this.tagTreeDomString = config.cache.tagTreeDomString;
 
     this.windowControl();
     this.instancePanelControl.addInstance();
@@ -171,15 +177,17 @@ export const CleePIX: {
           (<HTMLInputElement>e.target).style.backgroundColor = '#294c29';
           const orldId = CleePIX.currentInstanceId
           CleePIX.currentInstanceId = Number((<HTMLInputElement>e.target).dataset.id);
+          CleePIX.config.cache!.currentInstanceId = Number((<HTMLInputElement>e.target).dataset.id);
 
           window.dispatchEvent(new CustomEvent('ite_change', { detail: { id: orldId } }));
+          window.electron.ipcRenderer.invoke('config-update', CleePIX.config)
+            .then( config => { CleePIX.config = config });
 
-          //console.log(CleePIX.currentInstanceId);
           currentTextInput = <HTMLInputElement>e.target;
         });
         textInput.addEventListener('focusout', () => { textInput.readOnly = true });
 
-        if (id === '1') {
+        if (id === `${ CleePIX.currentInstanceId }`) {
           currentTextInput = textInput;
           currentTextInput.style.borderBottomColor = 'lightgreen';
           currentTextInput.style.backgroundColor = '#294c29';
@@ -438,28 +446,35 @@ export const CleePIX: {
 
             if (button.dataset.loaded === 'false' || isFirst === false) {
               button.dataset.loaded = 'true';
-              await getTagTree(li, Number(button.dataset.tagId));
+              await getTagTree(li, CleePIX.currentInstanceId, Number(button.dataset.tagId));
             }
 
             const subUl = li.querySelector<HTMLUListElement>('ul.tag-tree')!;
             if (button.dataset.opend === 'false') {
-              subUl.hidden = false;
+              subUl.classList.add('show');
+              subUl.style.height = `${subUl.scrollHeight}px`;
+              setTimeout(() => { subUl.style.height = 'auto' }, 250);
+              subUl.inert = false;
               button.dataset.opend = 'true';
               button.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
             } else {
-              subUl.hidden = true;
+              subUl.classList.remove('show');
+              subUl.style.height = `${subUl.scrollHeight}px`;
+              setTimeout(() => { subUl.style.height = '0' }, 5);
+              subUl.inert = true;
               button.dataset.opend = 'false';
               button.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
             }
-          })
+            console.log(CleePIX.currentInstanceId);
+          });
 
-          li.addEventListener('mouseover', () => {
-
+          li.addEventListener('mouseover', (e) => {
+            e.stopPropagation();
             target.tagMenuButtonList[index].hidden = false;
           });
 
-          li.addEventListener('mouseout', () => {
-
+          li.addEventListener('mouseout', (e) => {
+            e.stopPropagation();
             target.tagMenuButtonList[index].hidden = true;
           });
         });
@@ -511,7 +526,10 @@ export const CleePIX: {
                     target.expansionButtonList[index].dataset.loaded = 'true';
                     if (target.expansionButtonList[index].dataset.opend === 'false') {
                       target.expansionButtonList[index].dataset.opend = 'true';
-                      subUl.hidden = false;
+                      subUl.classList.add('show');
+                      subUl.style.height = `${subUl.scrollHeight}px`;
+                      setTimeout(() => { subUl!.style.height = 'auto' }, 250);
+                      subUl.inert = false;
                     }
                     insertNewTag(subUl, Number(button.dataset.tagId));
                     showMenuDomWrap.hidden = true;
@@ -553,7 +571,7 @@ export const CleePIX: {
 
         const ul = document.createElement('ul');
         isRoot === true ? ul.classList.add('tag-tree', 'animate__animated')
-          : ul.classList.add('tag-tree', 'sub', 'animate__animated');
+          : ul.classList.add('tag-tree', 'sub');
         ul.tabIndex = 0;
         ul.role = isRoot === true ? 'tree' : 'group';
         ul.ariaLabel = 'タグ選択ツリー';
@@ -561,38 +579,30 @@ export const CleePIX: {
         return ul;
       }
 
-      function createTreeItem(id: Number, name: string): [
-        li: HTMLLIElement, expansionButton: HTMLButtonElement,
-        tagNameButton: HTMLButtonElement, tagMenuButton: HTMLButtonElement
-      ] {
+      function setDragEventLi(targetLi: HTMLLIElement) {
 
-        const li = document.createElement('li');
-        li.role = 'treeitem';
-        li.id = `item-tag-${id}`;
-        li.dataset.tagId = `${id}`;
-        li.draggable = true;
-        li.addEventListener('dragstart', (e) => {
-          e.dataTransfer!.setData('text/plain', (<HTMLLIElement>e.target).id);
+        targetLi.addEventListener('dragstart', (e) => {
+          if (targetLi.dataset.tagId !== 'none') e.dataTransfer!.setData('text/plain', (<HTMLLIElement>e.target).id);
         });
-        li.addEventListener('dragover', (e) => {
+        targetLi.addEventListener('dragover', (e) => {
           e.preventDefault();
           e.stopPropagation();
           e.dataTransfer!.dropEffect = 'move';
-          li.style.borderTop = '1px solid #cccccc';
-          li.parentElement!.style.backgroundColor = '#2d2d2d';
+          targetLi.style.borderTop = '1px solid #cccccc';
+          targetLi.parentElement!.style.backgroundColor = '#2d2d2d';
         });
-        li.addEventListener('dragleave', (e) => {
+        targetLi.addEventListener('dragleave', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          li.style.borderTop = 'unset';
-          li.parentElement!.style.backgroundColor = 'unset';
+          targetLi.style.borderTop = 'unset';
+          targetLi.parentElement!.style.backgroundColor = 'unset';
         });
-        li.addEventListener('drop', (e) => {
+        targetLi.addEventListener('drop', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          li.style.borderTop = 'unset';
+          targetLi.style.borderTop = 'unset';
 
-          const ul = <HTMLUListElement>li.parentElement!;
+          const ul = <HTMLUListElement>targetLi.parentElement!;
           ul.style.backgroundColor = 'unset';
 
           let itemId: string = '';
@@ -614,7 +624,7 @@ export const CleePIX: {
             const dragTarget = rootUl.querySelector<HTMLLIElement>(`#${itemId}`)!;
             const dragTargetButton = dragTarget.querySelector<HTMLButtonElement>('button.tag-name')!;
             const hitDragTarget = ul.querySelector<HTMLButtonElement>(`button[data-parent-tag-id="${dragTarget.dataset.parentTagId}"][data-tag-id="${dragTarget.dataset.tagId}"]`);
-            if (hitDragTarget === null) {
+            if (hitDragTarget === null && targetLi.dataset.tagId !== 'none') {
               window.electron.ipcRenderer
                 .invoke('update-tag-structure', {
                   instanceId: CleePIX.currentInstanceId,
@@ -627,9 +637,25 @@ export const CleePIX: {
                   }
                 });
             }
-            ul.insertBefore(dragTarget, li);
+            ul.insertBefore(dragTarget, targetLi);
+            if (targetLi.dataset.tagId === 'none') {
+              targetLi.remove();
+            }
           }
         });
+      }
+
+      function createTreeItem(id: Number, name: string): [
+        li: HTMLLIElement, expansionButton: HTMLButtonElement,
+        tagNameButton: HTMLButtonElement, tagMenuButton: HTMLButtonElement
+      ] {
+
+        const li = document.createElement('li');
+        li.role = 'treeitem';
+        li.id = `item-tag-${id}`;
+        li.dataset.tagId = `${id}`;
+        li.draggable = true;
+        setDragEventLi(li);
 
         const buttonWrap = document.createElement('span');
         buttonWrap.classList.add('for-hover');
@@ -660,21 +686,25 @@ export const CleePIX: {
         return [li, expansionButton, tagNameButton, tagMenuButton];
       }
 
-      const getTagTree = async (target: HTMLLIElement | null, id: number): Promise<{ [key: string]: HTMLButtonElement[] | HTMLUListElement[] | null }> => {
+      const getTagTree = async (
+        target: HTMLLIElement | null, instanceId: number, parentId: number
+      ): Promise<{ [key: string]: HTMLButtonElement[] | HTMLUListElement[] | null }> => {
 
         return new Promise(async (resolve) => {
 
           let treeItems: any = null;
           while (treeItems === null) {
             if (target === null) {
-              treeItems = await window.electron.ipcRenderer.invoke('get-tag-tree', id);
+              treeItems = await window.electron.ipcRenderer.invoke('get-tag-tree', instanceId);
             } else {
               treeItems = await window.electron.ipcRenderer
-                .invoke('get-sub-tags', {
-                  instanceId: CleePIX.currentInstanceId, tagId: id
-                });
+                .invoke('get-sub-tags', { instanceId, parentId });
             }
           }
+          console.log('---------');
+          console.log(instanceId);
+          console.log(parentId);
+          console.log('---------');
 
           const isRoot = target === null ? true : false;
           const ul = initTagTreeUl(isRoot);
@@ -691,33 +721,7 @@ export const CleePIX: {
 
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
-              if (isRoot === false) {
-                //console.log('sub');
-                const clickTagNameButton = target?.querySelector<HTMLButtonElement>('button.tag-name')!;
-                tagNameButton.dataset.tagChain =
-                  (clickTagNameButton.dataset.tagChain + ',' + id + ',').replace(/^,|,$/g, '');
-                tagNameButton.dataset.parentTagId = `${id}`;
-                li.dataset.parentTagId = `${id}`;
-              } else {
-                //console.log('root');
-                tagNameButton.dataset.tagChain = '';
-                tagNameButton.dataset.parentTagId = '0';
-                li.dataset.parentTagId = '0';
-              }
-
-              if (isRoot === false) {
-                console.log('sub');
-                const clickTagNameButton = target?.querySelector<HTMLButtonElement>('button.tag-name')!;
-                tagNameButton.dataset.tagChain =
-                  (clickTagNameButton.dataset.tagChain + ',' + id + ',').replace(/^,|,$/g, '');
-                tagNameButton.dataset.parentTagId = `${id}`;
-                li.dataset.parentTagId = `${id}`;
-              } else {
-                console.log('root');
-                tagNameButton.dataset.tagChain = '';
-                tagNameButton.dataset.parentTagId = '0';
-                li.dataset.parentTagId = '0';
-              }
+              insertAttrTreeItem(isRoot, parentId, li, tagNameButton, target!)
 
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
@@ -727,10 +731,12 @@ export const CleePIX: {
           } else {
             const li = document.createElement('li');
             li.role = 'treeitem';
+            li.dataset.tagId = 'none';
             const button = document.createElement('button');
             button.style.paddingLeft = '15px';
             button.dataset.tagId = 'none';
             button.textContent = '登録無し';
+            setDragEventLi(li);
 
             expansionButtonList.push(button);
             li.append(button);
@@ -742,7 +748,7 @@ export const CleePIX: {
 
           if (target === null) {
 
-            if (CleePIX.currentInstanceId !== id) {
+            if (CleePIX.currentInstanceId !== instanceId) {
               ul.classList.add('animate__fadeOutRight');
               ul.inert = true;
             } else ul.classList.add('animate__fadeInLeft');
@@ -751,14 +757,14 @@ export const CleePIX: {
               expansionButtonList, tagNameButtonList, tagMenuButtonList
             }, true);
 
-            CleePIX.liveDom.tagTreePanel[id] = ul;
+            CleePIX.liveDom.tagTreePanel[instanceId] = ul;
             CleePIX.liveDom.instancePanel
               .querySelector<HTMLDivElement>('div.tag-select-panel')!
               .insertAdjacentElement('beforeend', ul);
           } else {
-            ul.hidden = true;
-            ul.dataset.parentTagId = `${id}`;
-            ul.classList.add('sub', 'animate__fadeInLeft');
+            ul.inert = true;
+            ul.dataset.parentTagId = `${parentId}`;
+            ul.classList.add('sub');
             target.insertAdjacentElement('beforeend', ul);
             setTagEvent({
               expansionButtonList, tagNameButtonList, tagMenuButtonList
@@ -774,13 +780,13 @@ export const CleePIX: {
         targetTagNameButton: HTMLButtonElement, readLi: HTMLLIElement
       ) {
         if (isRoot === false) {
-          const clickTagNameButton = readLi.querySelector<HTMLButtonElement>('button.tag-name')!;
+          /*const clickTagNameButton = readLi.querySelector<HTMLButtonElement>('button.tag-name')!;
           targetTagNameButton.dataset.tagChain =
-            (clickTagNameButton.dataset.tagChain + ',' + parentTagId + ',').replace(/^,|,$/g, '');
+            (clickTagNameButton.dataset.tagChain + ',' + parentTagId + ',').replace(/^,|,$/g, '');*/
           targetTagNameButton.dataset.parentTagId = `${parentTagId}`;
           targetLi.dataset.parentTagId = `${parentTagId}`;
         } else {
-          targetTagNameButton.dataset.tagChain = '';
+          //targetTagNameButton.dataset.tagChain = '';
           targetTagNameButton.dataset.parentTagId = '0';
           targetLi.dataset.parentTagId = '0';
         }
@@ -906,17 +912,24 @@ export const CleePIX: {
         .addEventListener('click', () => { insertNewTag() });
 
       CleePIX.instanceDBs.forEach(db => {
-        getTagTree(null, db.id).then(res => {
+        getTagTree(null, db.id, 0).then(res => {
           res.expansionButtonList!.forEach(button => {
-            getTagTree(<HTMLLIElement>(button.parentNode?.parentNode), Number(button.dataset.tagId));
+            getTagTree(<HTMLLIElement>(button.parentNode?.parentNode), db.id, Number(button.dataset.tagId));
           });
         });
       });
 
-      window.addEventListener('ite_change', (e) => {
+      window.addEventListener('ite_change', async (e) => {
         if (CleePIX.liveDom.tagTreePanel[e.detail.id] !== undefined) {
           CleePIX.liveDom.tagTreePanel[e.detail.id].classList.replace('animate__fadeInLeft', 'animate__fadeOutRight');
           CleePIX.liveDom.tagTreePanel[e.detail.id].inert = true;
+        }
+        if (CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId] === undefined) {
+          await getTagTree(null, CleePIX.currentInstanceId, 0).then(res => {
+            res.expansionButtonList!.forEach(button => {
+              getTagTree(<HTMLLIElement>(button.parentNode?.parentNode), CleePIX.currentInstanceId, Number(button.dataset.tagId));
+            });
+          });
         }
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].classList.replace('animate__fadeOutRight', 'animate__fadeInLeft');
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].inert = false;

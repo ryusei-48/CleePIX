@@ -30864,8 +30864,13 @@ const CleePIXMain = {
     electron.ipcMain.handle("get-config", () => {
       return this.config.store;
     });
+    electron.ipcMain.handle("config-update", (_2, config) => {
+      this.configTemp = config;
+      this.config.store = this.configTemp;
+      return this.config.store;
+    });
     electron.ipcMain.handle("bookmark-file", () => {
-      const bookmarks = lib$2.parseByPath("./お気に入り_2023_04_03.html");
+      const bookmarks = lib$2.parseByPath("./bookmarks_2023_04_03_vivaldi.html");
       return bookmarks;
     });
     electron.ipcMain.on("window-close", () => {
@@ -30906,7 +30911,7 @@ const CleePIXMain = {
       this.configTemp.instance?.push(newInstance);
       this.initializeDB(newInstance);
       this.config.store = this.configTemp;
-      this.Windows.main?.webContents.send("instance-update", this.config.store);
+      this.Windows.main?.webContents.send("instance-update", this.config.store.instance);
       return newInstance;
     });
     electron.ipcMain.on("remove-instance", (_2, id) => {
@@ -31004,7 +31009,7 @@ const CleePIXMain = {
       const tagsStructure = this.storage[res.instanceId].db?.prepare(`SELECT * FROM tags_structure WHERE parent_id = ?`);
       const tags2 = this.storage[res.instanceId].db?.prepare(`SELECT * FROM tags WHERE id = ?`);
       const tagsRes = [];
-      tagsStructure?.all(res.tagId).forEach((structure) => {
+      tagsStructure?.all(res.parentId).forEach((structure) => {
         tagsRes.push(tags2?.get(structure.child_id));
       });
       return tagsRes;

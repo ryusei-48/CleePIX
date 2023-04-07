@@ -66,8 +66,14 @@ const CleePIXMain: {
       return this.config.store;
     });
 
+    ipcMain.handle('config-update', (_, config) => {
+      this.configTemp = config;
+      this.config.store = this.configTemp;
+      return this.config.store;
+    });
+
     ipcMain.handle('bookmark-file', () => {
-      const bookmarks = parseByPath('./お気に入り_2023_04_03.html');
+      const bookmarks = parseByPath('./bookmarks_2023_04_03_vivaldi.html');
       return bookmarks;
     });
 
@@ -117,7 +123,7 @@ const CleePIXMain: {
       this.initializeDB( newInstance );
       this.config.store = this.configTemp;
 
-      this.Windows.main?.webContents.send('instance-update', this.config.store);
+      this.Windows.main?.webContents.send('instance-update', this.config.store.instance);
 
       return newInstance;
     });
@@ -215,7 +221,7 @@ const CleePIXMain: {
       const tags = this.storage[ res.instanceId ].db
         ?.prepare(`SELECT * FROM tags WHERE id = ?`)
       const tagsRes: any[] = []
-      tagsStructure?.all( res.tagId ).forEach( structure => {
+      tagsStructure?.all( res.parentId ).forEach( structure => {
         tagsRes.push( tags?.get( structure.child_id ) );
       })
       return tagsRes;
