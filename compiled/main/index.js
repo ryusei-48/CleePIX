@@ -30847,7 +30847,7 @@ const CleePIXMain = {
           id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
         }],
-        cache: { currentInstanceId: 1, tagTreeDomString: null }
+        cache: { currentInstanceId: 1, tagTreeDomStrings: null }
       };
     }
     this.configTemp = this.config.store;
@@ -30901,6 +30901,10 @@ const CleePIXMain = {
           return;
         }
       });
+    });
+    electron.ipcMain.handle("set-tag-tree-cache", (_2, domString) => {
+      this.configTemp.cache.tagTreeDomStrings = domString;
+      this.config.store = this.configTemp;
     });
     electron.ipcMain.handle("add-instance", () => {
       this.configTemp.instance = this.configTemp.instance?.sort((a, b) => {

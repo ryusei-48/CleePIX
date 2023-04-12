@@ -10,7 +10,10 @@ import { parseByPath } from "bookmark-file-parser";
 
 export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
-  cache: { currentInstanceId: number, tagTreeDomString: string | null }
+  cache?: {
+    currentInstanceId: number,
+    tagTreeDomStrings: { [key: number]: string } | null
+  }
 }
 
 const USER_DATA_PATH = app.getPath('userData');
@@ -41,7 +44,7 @@ const CleePIXMain: {
           label: 'main', id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
         }],
-        cache: { currentInstanceId: 1, tagTreeDomString: null }
+        cache: { currentInstanceId: 1, tagTreeDomStrings: null }
       }
     }
 
@@ -112,15 +115,20 @@ const CleePIXMain: {
       });
     });
 
+    ipcMain.handle('set-tag-tree-cache', (_, domString) => {
+      this.configTemp.cache!.tagTreeDomStrings = domString;
+      this.config.store = this.configTemp;
+    });
+
     ipcMain.handle('add-instance', () => {
-      this.configTemp.instance = this.configTemp.instance?.sort( ( a, b ) => {
-        return ( a.id < b.id ) ? -1 : 1;
+      this.configTemp.instance = this.configTemp.instance?.sort((a, b) => {
+        return (a.id < b.id) ? -1 : 1;
       });
 
       const newId: number = this.configTemp.instance!.slice(-1)[0].id + 1;
       const newInstance = { label: 'new instance', id: newId, path: STORAGE_PATH + `/ite_${randomString()}.db` };
-      this.configTemp.instance?.push( newInstance );
-      this.initializeDB( newInstance );
+      this.configTemp.instance?.push(newInstance);
+      this.initializeDB(newInstance);
       this.config.store = this.configTemp;
 
       this.Windows.main?.webContents.send('instance-update', this.config.store.instance);
@@ -128,24 +136,24 @@ const CleePIXMain: {
       return newInstance;
     });
 
-    ipcMain.on('remove-instance', ( _, id ) => {
+    ipcMain.on('remove-instance', (_, id) => {
       let instancePath: string = '';
       let instanceId: number = 0;
       let indexTemp: number = 0;
-      this.configTemp.instance?.forEach( ( ite, index ) => {
-        if ( ite.id === id ) {
+      this.configTemp.instance?.forEach((ite, index) => {
+        if (ite.id === id) {
           indexTemp = index;
           instanceId = ite.id;
           instancePath = ite.path; return;
         }
       });
 
-      this.storage[ instanceId ].db?.close();
-      fs.unlink( instancePath, (e) => {
+      this.storage[instanceId].db?.close();
+      fs.unlink(instancePath, (e) => {
         console.log(e);
-        if ( e === null ) {
-          delete this.storage[ instanceId ];
-          this.configTemp.instance?.splice( indexTemp, 1 );
+        if (e === null) {
+          delete this.storage[instanceId];
+          this.configTemp.instance?.splice(indexTemp, 1);
           this.config.store = this.configTemp;
           this.Windows.main?.webContents.send('ite-change', this.config.store);
         }
@@ -158,44 +166,44 @@ const CleePIXMain: {
       )!.all(query.keyword + '%');
     });
 
-    ipcMain.handle('add-tag-suggest', ( _, query ) => {
+    ipcMain.handle('add-tag-suggest', (_, query) => {
       return this.storage[query.id].db?.prepare(
         `SELECT * FROM tags WHERE name LIKE ?`
-      )!.get( query.value + '%' );
+      )!.get(query.value + '%');
     });
 
-    ipcMain.handle('add-tag', ( _, query ) => {
+    ipcMain.handle('add-tag', (_, query) => {
       let res: Database.RunResult | null = null;
       let child_id: number | bigint = 0;
       try {
         res = this.storage[query.instanceId].db?.prepare(
-                `SELECT * FROM tags WHERE name = ?`)!.get( query.name );
+          `SELECT * FROM tags WHERE name = ?`)!.get(query.name);
         child_id = res === undefined ? 0 : (<any>res!).id;
-        if ( res === undefined ) {
+        if (res === undefined) {
 
           res = this.storage[query.instanceId].db!.prepare(
             `INSERT INTO tags (name) VALUES ( ? )`
-          )!.run( query.name );
+          )!.run(query.name);
           child_id = res!.lastInsertRowid;
         }
         this.storage[query.instanceId].db!.prepare(
           `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
-        ).run( query.parentTagId !== null ? query.parentTagId : 0, child_id );
+        ).run(query.parentTagId !== null ? query.parentTagId : 0, child_id);
         return res;
-      }catch (e) { console.log(e); return null; }
+      } catch (e) { console.log(e); return null; }
     });
 
-    ipcMain.handle('update-tag-name', ( _, query ) => {
+    ipcMain.handle('update-tag-name', (_, query) => {
       let res: Database.RunResult | null = null;
       try {
         res = this.storage[query.instanceId].db?.prepare(
-          `SELECT * FROM tags WHERE name = ?`)!.get( query.name );
-        if ( res === undefined ) {
+          `SELECT * FROM tags WHERE name = ?`)!.get(query.name);
+        if (res === undefined) {
           res = this.storage[query.instanceId].db!.prepare(
-            `UPDATE tags SET name = ? WHERE id = ?`)!.run( query.name, query.tagId );
+            `UPDATE tags SET name = ? WHERE id = ?`)!.run(query.name, query.tagId);
         }
         return res;
-      }catch (e) { console.log(e); return null; }
+      } catch (e) { console.log(e); return null; }
     });
 
     ipcMain.handle('get-tag-tree', async (_, id) => {
@@ -203,11 +211,11 @@ const CleePIXMain: {
       try {
         res = this.storage[id].db?.prepare(`SELECT * FROM tags`)!.all()!;
         const isParentQuery = this.storage[id].db?.prepare(`SELECT * FROM tags_structure WHERE parent_id = ?`);
-        const isHit = isParentQuery?.all( 0 )!;
-        res.forEach( ( tag ) => {
-          isHit.forEach( hit => {
-            if ( tag.id === hit.child_id ) {
-              editres.push( tag );
+        const isHit = isParentQuery?.all(0)!;
+        res.forEach((tag) => {
+          isHit.forEach(hit => {
+            if (tag.id === hit.child_id) {
+              editres.push(tag);
             }
           });
         });
@@ -215,33 +223,33 @@ const CleePIXMain: {
       return editres;
     });
 
-    ipcMain.handle('get-sub-tags', ( _, res ) => {
-      const tagsStructure = this.storage[ res.instanceId ].db
+    ipcMain.handle('get-sub-tags', (_, res) => {
+      const tagsStructure = this.storage[res.instanceId].db
         ?.prepare(`SELECT * FROM tags_structure WHERE parent_id = ?`);
-      const tags = this.storage[ res.instanceId ].db
+      const tags = this.storage[res.instanceId].db
         ?.prepare(`SELECT * FROM tags WHERE id = ?`)
       const tagsRes: any[] = []
-      tagsStructure?.all( res.parentId ).forEach( structure => {
-        tagsRes.push( tags?.get( structure.child_id ) );
+      tagsStructure?.all(res.parentId).forEach(structure => {
+        tagsRes.push(tags?.get(structure.child_id));
       })
       return tagsRes;
     });
 
-    ipcMain.handle('update-tag-structure', ( _, structure ) => {
+    ipcMain.handle('update-tag-structure', (_, structure) => {
       try {
         const delRes = this.storage[structure.instanceId].db!.prepare(
           `DELETE FROM tags_structure WHERE parent_id = ? AND child_id = ?`
-        ).run( structure.delete.parentId, structure.delete.childId );
+        ).run(structure.delete.parentId, structure.delete.childId);
         const setRes = this.storage[structure.instanceId].db!.prepare(
           `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
-        ).run( structure.set.parentId, structure.set.childId );
-        if ( delRes.changes === 1 && setRes.changes === 1 ) {
+        ).run(structure.set.parentId, structure.set.childId);
+        if (delRes.changes === 1 && setRes.changes === 1) {
           return true;
-        }else return false;
+        } else return false;
       } catch (e) { console.log(e); return false; }
     });
 
-    ipcMain.handle('get-http-request', async ( _, url ) => {
+    ipcMain.handle('get-http-request', async (_, url) => {
       const response = await fetch(url, {
         method: 'GET',
         mode: 'no-cors',
@@ -252,12 +260,12 @@ const CleePIXMain: {
       if (response && response.ok) {
         const $ = cheerio.load(await response.text());
         let description = $(`meta[property="og:description"]`).attr('content');
-        if ( description === undefined ) description = $(`meta[name="description"]`).attr('content');
+        if (description === undefined) description = $(`meta[name="description"]`).attr('content');
         return {
           title: $('title').text(), description,
           image: $(`meta[property='og:image']`).attr('content')
         }
-      }else return null;
+      } else return null;
     });
   },
 
@@ -324,19 +332,19 @@ const CleePIXMain: {
       for (let i = 1; i <= 10; i++) {
         this.storage[storage.id].db!.prepare(
           `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run( 0, i );
+        ).run(0, i);
       }
 
       for (let i = 11; i <= 18; i++) {
         this.storage[storage.id].db!.prepare(
           `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run( 2, i );
+        ).run(2, i);
       }
 
       for (let i = 19; i <= 23; i++) {
         this.storage[storage.id].db!.prepare(
           `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run( 6, i );
+        ).run(6, i);
       }
     }
 

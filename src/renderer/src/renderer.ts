@@ -13,10 +13,10 @@ declare global {
 
 export const CleePIX: {
 
-  init: () => void, currentInstanceId: number, tagTreeDomString: string | null,
+  init: () => void, currentInstanceId: number,
   config: {
     instance?: { label: string, id: number, path: string }[],
-    cache?: { currentInstanceId: number, tagTreeDomString: string | null }
+    cache?: { currentInstanceId: number, tagTreeDomStrings: { [key: number]: string } | null }
   },
   instanceDBs: { label: string, id: number, path: string }[],
   instanceLabels: string[], windowControl: () => void,
@@ -39,7 +39,7 @@ export const CleePIX: {
 } = {
 
   currentInstanceId: 0, instanceLabels: ['default'],
-  instanceDBs: [], tagTreeDomString: null, config: {},
+  instanceDBs: [], config: {},
   liveDom: {
     base: includeDom.base(), instancePanel: includeDom.instancePanel(),
     addInstance: includeDom.addInstance(),
@@ -57,7 +57,6 @@ export const CleePIX: {
     this.config = config;
     this.instanceDBs = config.instance;
     this.currentInstanceId = config.cache.currentInstanceId;
-    this.tagTreeDomString = config.cache.tagTreeDomString;
 
     this.windowControl();
     this.instancePanelControl.addInstance();
@@ -181,13 +180,13 @@ export const CleePIX: {
 
           window.dispatchEvent(new CustomEvent('ite_change', { detail: { id: orldId } }));
           window.electron.ipcRenderer.invoke('config-update', CleePIX.config)
-            .then( config => { CleePIX.config = config });
+            .then(config => { CleePIX.config = config });
 
           currentTextInput = <HTMLInputElement>e.target;
         });
         textInput.addEventListener('focusout', () => { textInput.readOnly = true });
 
-        if (id === `${ CleePIX.currentInstanceId }`) {
+        if (id === `${CleePIX.currentInstanceId}`) {
           currentTextInput = textInput;
           currentTextInput.style.borderBottomColor = 'lightgreen';
           currentTextInput.style.backgroundColor = '#294c29';
@@ -465,7 +464,6 @@ export const CleePIX: {
               button.dataset.opend = 'false';
               button.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
             }
-            console.log(CleePIX.currentInstanceId);
           });
 
           li.addEventListener('mouseover', (e) => {
@@ -489,6 +487,8 @@ export const CleePIX: {
             const buttonWrap = <HTMLSpanElement>button.parentNode;
             buttonWrap.style.backgroundColor = '#414141';
             currentTagNameWrap = buttonWrap;
+
+            console.log(button.tagName);
           })
         });
 
@@ -567,11 +567,12 @@ export const CleePIX: {
         });
       }
 
-      function initTagTreeUl(isRoot: boolean = false): HTMLUListElement {
+      function initTagTreeUl(isRoot: boolean = false, instanceId: number): HTMLUListElement {
 
         const ul = document.createElement('ul');
         isRoot === true ? ul.classList.add('tag-tree', 'animate__animated')
           : ul.classList.add('tag-tree', 'sub');
+        ul.dataset.instanceId = `${ instanceId }`;
         ul.tabIndex = 0;
         ul.role = isRoot === true ? 'tree' : 'group';
         ul.ariaLabel = 'タグ選択ツリー';
@@ -701,13 +702,9 @@ export const CleePIX: {
                 .invoke('get-sub-tags', { instanceId, parentId });
             }
           }
-          console.log('---------');
-          console.log(instanceId);
-          console.log(parentId);
-          console.log('---------');
 
           const isRoot = target === null ? true : false;
-          const ul = initTagTreeUl(isRoot);
+          const ul = initTagTreeUl(isRoot, instanceId);
 
           const expansionButtonList: HTMLButtonElement[] = []
           const tagNameButtonList: HTMLButtonElement[] = []
@@ -846,7 +843,6 @@ export const CleePIX: {
                       tagMenuButtonList: [tagMenuButton]
                     });
                     const readLi = <HTMLLIElement>targetUl?.parentElement!;
-                    console.log(readLi.dataset.tagChain);
                     insertAttrTreeItem(isRoot, tagId!, insertLi, tagNameButton, readLi)
                     targetUl?.insertAdjacentElement('beforeend', insertLi);
                     if (targetUl!.childElementCount <= 3) {
@@ -907,17 +903,45 @@ export const CleePIX: {
         input.focus();
       }
 
+      function setTagTreeCache(): void {
+        const tagTreeCache: { [key: number]: string } = {}
+        for (const [key, ul] of Object.entries(CleePIX.liveDom.tagTreePanel)) {
+          tagTreeCache[key] = ul.outerHTML;
+        }
+        window.electron.ipcRenderer.invoke('set-tag-tree-cache', tagTreeCache);
+      }
+
+      setInterval(setTagTreeCache, 2000);
+
       CleePIX.liveDom.instancePanel
         .querySelector<HTMLButtonElement>('#add-new-tag')!
         .addEventListener('click', () => { insertNewTag() });
 
-      CleePIX.instanceDBs.forEach(db => {
-        getTagTree(null, db.id, 0).then(res => {
-          res.expansionButtonList!.forEach(button => {
-            getTagTree(<HTMLLIElement>(button.parentNode?.parentNode), db.id, Number(button.dataset.tagId));
+      if (CleePIX.config.cache?.tagTreeDomStrings !== null) {
+        const expansionButtonList: HTMLButtonElement[] = []
+        const tagNameButtonList: HTMLButtonElement[] = []
+        const tagMenuButtonList: HTMLButtonElement[] = []
+        const tagSelectPanel = CleePIX.liveDom.instancePanel
+            .querySelector<HTMLDivElement>('div.tag-select-panel')!;
+        for (const [key, ul] of Object.entries(CleePIX.config.cache!.tagTreeDomStrings)) {
+          tagSelectPanel.insertAdjacentHTML('beforeend', ul);
+          const tagTree = tagSelectPanel.querySelector<HTMLUListElement>(`ul[role='tree'][data-instance-id='${ key }']`)!;
+          CleePIX.liveDom.tagTreePanel[Number(key)] = tagTree;
+          expansionButtonList.push( ...tagTree.querySelectorAll<HTMLButtonElement>('button.expansion') );
+          tagNameButtonList.push( ...tagTree.querySelectorAll<HTMLButtonElement>('button.tag-name') );
+          tagMenuButtonList.push( ...tagTree.querySelectorAll<HTMLButtonElement>('button.tag-menu-btn') );
+        }
+        setTagEvent( { expansionButtonList, tagNameButtonList, tagMenuButtonList } );
+      } else {
+        console.log('no cache');
+        CleePIX.instanceDBs.forEach(db => {
+          getTagTree(null, db.id, 0).then(res => {
+            res.expansionButtonList!.forEach(button => {
+              getTagTree(<HTMLLIElement>(button.parentNode?.parentNode), db.id, Number(button.dataset.tagId));
+            });
           });
         });
-      });
+      }
 
       window.addEventListener('ite_change', async (e) => {
         if (CleePIX.liveDom.tagTreePanel[e.detail.id] !== undefined) {
