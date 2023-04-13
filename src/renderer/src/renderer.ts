@@ -20,6 +20,7 @@ export const CleePIX: {
   },
   instanceDBs: { label: string, id: number, path: string }[],
   instanceLabels: string[], windowControl: () => void,
+  AppSetingPanel: () => void,
   instancePanelControl: {
     addInstance: () => void, addBookmark: () => void,
     addRssFeed: () => void, addText: () => void,
@@ -30,7 +31,7 @@ export const CleePIX: {
   }
   liveDom: {
     base: HTMLDivElement, instancePanel: HTMLDivElement,
-    addInstance: HTMLDivElement,
+    addAppSeting: HTMLDivElement, addInstance: HTMLDivElement,
     addBookmark: HTMLDivElement, addRssFeed: HTMLDivElement,
     addText: HTMLDivElement, addTagBlock: HTMLDivElement,
     tagTreePanel: { [key: number]: HTMLUListElement }
@@ -42,6 +43,7 @@ export const CleePIX: {
   instanceDBs: [], config: {},
   liveDom: {
     base: includeDom.base(), instancePanel: includeDom.instancePanel(),
+    addAppSeting: includeDom.addAppSetings(),
     addInstance: includeDom.addInstance(),
     addBookmark: includeDom.addBookmarkSeelector(),
     addRssFeed: includeDom.addRssFeedSeelector(),
@@ -59,6 +61,7 @@ export const CleePIX: {
     this.currentInstanceId = config.cache.currentInstanceId;
 
     this.windowControl();
+    this.AppSetingPanel();
     this.instancePanelControl.addInstance();
     this.instancePanelControl.addBookmark();
     this.instancePanelControl.addRssFeed();
@@ -66,11 +69,11 @@ export const CleePIX: {
     this.instancePanelControl.addTagBlock();
     this.instancePanelControl.tagTreePanel();
 
-    const script = document.createElement('script');
+    /*const script = document.createElement('script');
     //script.src = "https://platform.twitter.com/widgets.js";
     script.type = 'application/javascript';
     script.src = 'https://embed.nicovideo.jp/watch/sm41943302/script?w=640&h=360';
-    document.body.appendChild(script);
+    document.body.appendChild(script);*/
 
   },
 
@@ -108,6 +111,16 @@ export const CleePIX: {
           });
       }
     });
+  },
+
+  AppSetingPanel: function () {
+
+    this.instancePanelControl.commonModalWindow(
+      '#app-setings', this.liveDom.addAppSeting,
+      '.app-setings-modal-wrap', 'div.app-seting-element'
+    );
+
+    CleePIX.liveDom.instancePanel.insertAdjacentElement('afterend', this.liveDom.addAppSeting);
   },
 
   instancePanelControl: {
@@ -386,11 +399,11 @@ export const CleePIX: {
 
     commonModalWindow: function (click_id, domPram, wrapClass, focus_id = null) {
 
-      CleePIX.liveDom.instancePanel.querySelector(click_id)!
+      CleePIX.liveDom.base.querySelector(click_id)!
         .addEventListener('click', () => {
 
-          domPram.removeAttribute('inert');
-          CleePIX.liveDom.instancePanel.setAttribute('inert', 'true');
+          domPram.inert = false;
+          CleePIX.liveDom.instancePanel.inert = true;
           domPram
             .querySelector<HTMLDivElement>(wrapClass)
             ?.classList.add('show');
@@ -413,8 +426,8 @@ export const CleePIX: {
 
       function instancePanelHide(): void {
 
-        domPram.setAttribute('inert', 'true');
-        CleePIX.liveDom.instancePanel.removeAttribute('inert');
+        domPram.inert = true;
+        CleePIX.liveDom.instancePanel.inert = false;
         domPram
           .querySelector<HTMLDivElement>(wrapClass)
           ?.classList.remove('show');
@@ -488,7 +501,20 @@ export const CleePIX: {
             buttonWrap.style.backgroundColor = '#414141';
             currentTagNameWrap = buttonWrap;
 
-            console.log(button.tagName);
+            let tagIdChain: number[] = []
+            let parentTagId: number = 1;
+            let tmpDom: HTMLElement = button;
+            while ( parentTagId > 0 ) {
+              if ( tmpDom.tagName === 'LI' ) {
+                if ( parentTagId > 0 && tmpDom.dataset.parentTagId !== undefined ) {
+                  parentTagId = Number( tmpDom.dataset.parentTagId );
+                  tagIdChain.push( parentTagId );
+                }
+              }
+              tmpDom = <HTMLElement>tmpDom.parentNode;
+            }
+
+            console.log(tagIdChain);
           })
         });
 
@@ -520,7 +546,7 @@ export const CleePIX: {
                 case 'add-new-tag':
                   li.addEventListener('click', async () => {
                     if (subUl === null) {
-                      await getTagTree(targetLi, Number(button.dataset.tagId));
+                      await getTagTree(targetLi, CleePIX.currentInstanceId, Number(button.dataset.tagId));
                       subUl = targetLi.querySelector<HTMLUListElement>('ul.tag-tree.sub')!;
                     }
                     target.expansionButtonList[index].dataset.loaded = 'true';
@@ -918,6 +944,7 @@ export const CleePIX: {
         .addEventListener('click', () => { insertNewTag() });
 
       if (CleePIX.config.cache?.tagTreeDomStrings !== null) {
+        const treeItem: HTMLLIElement[] = []
         const expansionButtonList: HTMLButtonElement[] = []
         const tagNameButtonList: HTMLButtonElement[] = []
         const tagMenuButtonList: HTMLButtonElement[] = []
@@ -930,6 +957,8 @@ export const CleePIX: {
           expansionButtonList.push( ...tagTree.querySelectorAll<HTMLButtonElement>('button.expansion') );
           tagNameButtonList.push( ...tagTree.querySelectorAll<HTMLButtonElement>('button.tag-name') );
           tagMenuButtonList.push( ...tagTree.querySelectorAll<HTMLButtonElement>('button.tag-menu-btn') );
+
+          [...tagTree.querySelectorAll<HTMLLIElement>(`li[role='treeitem']`)].forEach( (li) => { setDragEventLi( li ) });
         }
         setTagEvent( { expansionButtonList, tagNameButtonList, tagMenuButtonList } );
       } else {

@@ -284,7 +284,7 @@ const CleePIXMain: {
       //this.storage.main.pragma("key='ymzkrk33'");
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "bookmarks" (
-          "id"	INTEGER NOT NULL UNIQUE, "type"	TEXT NOT NULL,
+          "id"	INTEGER NOT NULL UNIQUE,
           "title"	TEXT NOT NULL, "description"	TEXT,
           "data"	TEXT NOT NULL, "thunb"	TEXT NOT NULL,
           "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',

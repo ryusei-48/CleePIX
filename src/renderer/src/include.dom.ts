@@ -2,7 +2,8 @@ export const includeDom: {
 
   initDivDom: (inert?: boolean) => HTMLDivElement,
   base: () => HTMLDivElement,
-  instancePanel: () => HTMLDivElement, 
+  instancePanel: () => HTMLDivElement,
+  addAppSetings: () => HTMLDivElement,
   addInstance: () => HTMLDivElement,
   addTagBlock: ( inputId: string | null ) => HTMLDivElement,
   addBookmarkSeelector: () => HTMLDivElement,
@@ -26,6 +27,7 @@ export const includeDom: {
         <div class="app-name">
           <h1>cleepix</h1>
         </div>
+        <div class="app-setings"><button id="app-setings" aria-label="設定"><i class="fa-solid fa-gear"></i> 設定</button></div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
         <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
         <div id="close-win"><button aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button></div>
@@ -82,14 +84,28 @@ export const includeDom: {
     return dom;
   },
 
+  addAppSetings: function () {
+
+    const dom = this.initDivDom();
+    dom.id = 'show-app-setings';
+    dom.innerHTML = `
+      <div class="app-setings-modal-wrap"></div>
+      <div class="app-setings-modal">
+        <div tabindex='0' aria-label="アプリの設定" class="app-seting-element" tabindex="0" aria-label="インスタンスラベルフィールド">
+          <span class="label-group"></span>
+          <button aria-label="インスタンス追加" title="インスタンス追加" id="add-instance-btn">＋</button>
+        </div>
+      </div>
+  `;
+  return dom;
+  },
+
   addInstance: function () {
 
     const dom = this.initDivDom();
     dom.id = 'show-inscetance';
     dom.innerHTML = `
       <div class="instance-select-element-wrap"></div>
-    `;
-    dom.innerHTML += `
       <div class="instance-select-element">
         <div class="instance-names" tabindex="0" aria-label="インスタンスラベルフィールド">
           <span class="label-group"></span>
