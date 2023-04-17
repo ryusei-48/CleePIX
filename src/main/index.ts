@@ -25,12 +25,13 @@ const CleePIXMain: {
   storage: { [key: number]: { db?: Database.Database, stmt?: { [key: string]: Database.Statement } } },
   config: Store<storeConfig>, configTemp: storeConfig,
   run: () => void, initializeDB: (storage: { label: string, id: number, path: string }) => void,
-  createWindowInstance: () => BrowserWindow
+  createWindowInstance: () => BrowserWindow,
+  configUpdate: () => void
 
 } = {
 
   Windows: {}, storage: {}, configTemp: {},
-  config: new Store<storeConfig>({ encryptionKey: 'ymzkrk33' }),
+  config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
   run: function () {
 
@@ -65,13 +66,11 @@ const CleePIXMain: {
       });
     });
 
-    ipcMain.handle('get-config', () => {
-      return this.config.store;
-    });
+    /*this.config.onDidAnyChange((e) => {
+      console.log(e);
+    });*/
 
-    ipcMain.handle('config-update', (_, config) => {
-      this.configTemp = config;
-      this.config.store = this.configTemp;
+    ipcMain.handle('get-config', () => {
       return this.config.store;
     });
 
@@ -115,9 +114,15 @@ const CleePIXMain: {
       });
     });
 
+    ipcMain.on('set-ite-id-cache', (_, id) => {
+      this.configTemp.cache!.currentInstanceId = id;
+      this.config.set('cache', this.configTemp.cache);
+    });
+
     ipcMain.handle('set-tag-tree-cache', (_, domString) => {
       this.configTemp.cache!.tagTreeDomStrings = domString;
-      this.config.store = this.configTemp;
+      this.config.set('cache', this.configTemp.cache);
+      this.configUpdate();
     });
 
     ipcMain.handle('add-instance', () => {
@@ -129,9 +134,10 @@ const CleePIXMain: {
       const newInstance = { label: 'new instance', id: newId, path: STORAGE_PATH + `/ite_${randomString()}.db` };
       this.configTemp.instance?.push(newInstance);
       this.initializeDB(newInstance);
-      this.config.store = this.configTemp;
+      //this.config.store = this.configTemp;
+      this.config.set('instance', this.configTemp.instance);
 
-      this.Windows.main?.webContents.send('instance-update', this.config.store.instance);
+      this.configUpdate();
 
       return newInstance;
     });
@@ -150,12 +156,11 @@ const CleePIXMain: {
 
       this.storage[instanceId].db?.close();
       fs.unlink(instancePath, (e) => {
-        console.log(e);
         if (e === null) {
           delete this.storage[instanceId];
           this.configTemp.instance?.splice(indexTemp, 1);
-          this.config.store = this.configTemp;
-          this.Windows.main?.webContents.send('ite-change', this.config.store);
+          this.config.set( 'instance', this.configTemp.instance );
+          this.configUpdate();
         }
       });
     });
@@ -389,6 +394,11 @@ const CleePIXMain: {
     }
 
     return window;
+  },
+
+  configUpdate: function () {
+
+    this.Windows.main?.webContents.send('config-update', this.config.store);
   }
 }
 

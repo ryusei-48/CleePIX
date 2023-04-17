@@ -74,7 +74,7 @@ export const includeDom: {
         <span draggable="true" class="resize-panel-bar"></span>
         <div class="contents-panel">
           <!--<iframe style="width:100%;aspect-ratio:16 / 9;" src="https://etc.private.x-sv.com" title="爽快感・透明感が半端ない中毒性MAXのボカロ曲メドレー【全20曲】" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>-->
-          <iframe style="width:100%;aspect-ratio:16 / 9;" src="https://www.youtube.com/embed/twlM59bD6kM" title="夢花火 / 百鬼あやめ original" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          <iframe style="width:100%;aspect-ratio:16 / 9;" src="https://www.youtube.com/embed/py7U28qEbPU" title="夢花火 / 百鬼あやめ original" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
           <!--<blockquote class="twitter-tweet" data-theme="dark"><p lang="en" dir="ltr">First Starlink v2 satellites reach orbit <a href="https://t.co/0l08568mJ9">pic.twitter.com/0l08568mJ9</a></p>&mdash; Elon Musk (@elonmusk) <a href="https://twitter.com/elonmusk/status/1630394434847227909?ref_src=twsrc%5Etfw">February 28, 2023</a></blockquote>-->
           <!--<webview id="foo" src="https://etc.private.x-sv.com" style="width:100%;aspect-ratio:16 / 9;"></webview>-->
           <!--<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>-->
@@ -91,9 +91,18 @@ export const includeDom: {
     dom.innerHTML = `
       <div class="app-setings-modal-wrap"></div>
       <div class="app-setings-modal">
-        <div tabindex='0' aria-label="アプリの設定" class="app-seting-element" tabindex="0" aria-label="インスタンスラベルフィールド">
-          <span class="label-group"></span>
-          <button aria-label="インスタンス追加" title="インスタンス追加" id="add-instance-btn">＋</button>
+        <div aria-label="アプリの設定" class="app-seting-element" tabindex="0">
+          <button class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
+          <h2>データのインポートとエクスポート</h2>
+          <fieldset class="forms">
+            <legend>データのインポートとエクスポート</legend>
+            <div class="label"><label for="add-bookmark-thumb">ブックマークのインポート</label></div>
+            <div class="form">
+              <label role="button" class="add-custom-thumb" for="import-bookmark">ファイル選択</label>
+              <input type="file" id="import-bookmark"><br/>
+              <span>※各ブラウザーからHTML形式のエクスポートファイルを読み込みます。</span>
+            </div>
+          </fieldset>
         </div>
       </div>
   `;
@@ -141,32 +150,35 @@ export const includeDom: {
     dom.innerHTML = `
       <div class="add-bookmark-modal-wrap"></div>
       <div class="add-bookmark-modal">
-        <h2>ブックマークを追加</h2>
-        <fieldset class="forms">
-          <legend>ブックマークを追加するための入力フィールド</legend>
-          <div class="label"><label for="add-bookmark-url">URL</label></div>
-          <div class="form"><input type="url" id="add-bookmark-url"></div>
-          <div class="label"><label for="add-bookmark-title">タイトル</label></div>
-          <div class="form"><input type="text" id="add-bookmark-title"></div>
-          <div class="label"><label for="add-bookmark-thumb">サムネイル</label></div>
-          <div class="form">
-            <label role="button" class="add-custom-thumb" for="add-bookmark-thumb">カスタムサムネイルを設定</label>
-            <input type="file" id="add-bookmark-thumb">
-            <span>※ご自身でサムネイル画像を設定したい場合</span>
-          </div>
-          <div class="label"><label>説明</label></div>
-          <div class="form description">
-            <div class="description-input">
-              <textarea id="add-bookmark-description" placeholder="ページの説明を入力"></textarea>
+        <div class="add-bookmark-element">
+          <h2>ブックマークを追加</h2>
+          <fieldset class="forms">
+            <legend>ブックマークを追加するための入力フィールド</legend>
+            <div class="label"><label for="add-bookmark-url">URL</label></div>
+            <div class="form"><input type="url" id="add-bookmark-url"></div>
+            <div class="label"><label for="add-bookmark-title">タイトル</label></div>
+            <div class="form"><input type="text" id="add-bookmark-title"></div>
+            <div class="label"><label for="add-bookmark-thumb">サムネイル</label></div>
+            <div class="form">
+              <label role="button" class="add-custom-thumb" for="add-bookmark-thumb">カスタムサムネイルを設定</label>
+              <input type="file" id="add-bookmark-thumb">
+              <span>※ご自身でサムネイル画像を設定したい場合</span>
             </div>
-            <div class="view-thumb">
-              <span class="no-thumb">No thumbnail</span>
+            <div class="label"><label>説明</label></div>
+            <div class="form description">
+              <div class="description-input">
+                <textarea id="add-bookmark-description" placeholder="ページの説明を入力"></textarea>
+              </div>
+              <div class="view-thumb">
+                <span class="no-thumb">No thumbnail</span>
+              </div>
             </div>
-          </div>
-          <div class="label"><label for="add-bookmark-tags">タグ</label></div>
-          <div class="form tags"></div>
-          <button class="send-btn" id="add-bookmark-btn">追加</button>
-        </fieldset>
+            <div class="label"><label for="add-bookmark-tags">タグ</label></div>
+            <div class="form tags"></div>
+            <button class="send-btn" id="add-bookmark-btn">追加</button>
+          </fieldset>
+          <button class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
     `;
     return dom;
@@ -179,19 +191,22 @@ export const includeDom: {
     dom.innerHTML = `
       <div class="add-rss-feed-modal-wrap"></div>
       <div class="add-rss-feed-modal">
-        <h2>RSSフィードを追加</h2>
-        <fieldset class="forms">
-          <legend>RSSフィードを追加するための入力フィールド</legend>
-          <div class="label"><label for="add-rss-feed-title">サイトタイトル</label></div>
-          <div class="form"><input type="text" id="add-rss-feed-title"></div>
-          <div class="label"><label for="add-rss-feed-url">フィードURL</label></div>
-          <div class="form"><input type="url" id="add-rss-feed-url"></div>
-          <div class="label"><label for="add-rss-feed-thumb">サイトアイコン</label></div>
-          <div class="form"><input type="file" id="add-rss-feed-thumb"></div>
-          <div class="label"><label for="add-rss-tags">タグ</label></div>
-          <div class="form tags"></div>
-          <button class="send-btn" id="add-rss-feed-btn">追加</button>
-        </fieldset>
+        <div class="add-rss-feed-element">
+          <h2>RSSフィードを追加</h2>
+          <fieldset class="forms">
+            <legend>RSSフィードを追加するための入力フィールド</legend>
+            <div class="label"><label for="add-rss-feed-title">サイトタイトル</label></div>
+            <div class="form"><input type="text" id="add-rss-feed-title"></div>
+            <div class="label"><label for="add-rss-feed-url">フィードURL</label></div>
+            <div class="form"><input type="url" id="add-rss-feed-url"></div>
+            <div class="label"><label for="add-rss-feed-thumb">サイトアイコン</label></div>
+            <div class="form"><input type="file" id="add-rss-feed-thumb"></div>
+            <div class="label"><label for="add-rss-tags">タグ</label></div>
+            <div class="form tags"></div>
+            <button class="send-btn" id="add-rss-feed-btn">追加</button>
+          </fieldset>
+          <button class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
     `;
 
@@ -205,14 +220,17 @@ export const includeDom: {
     dom.innerHTML = `
       <div class="add-text-modal-wrap"></div>
       <div class="add-text-modal">
-        <h2>定型文・メモを追加</h2>
-        <fieldset class="forms">
-          <legend>定型文を追加するための入力フィールド</legend>
-          <div class="label"><label for="add-text-title">タイトル</label></div>
-          <div class="form"><input type="text" id="add-text-title"></div>
-          <div id="show-add-text-field"></div>
-          <button class="send-btn" id="add-text-btn">追加</button>
-        </fieldset>
+        <div class="add-text-element">
+          <h2>定型文・メモを追加</h2>
+          <fieldset class="forms">
+            <legend>定型文を追加するための入力フィールド</legend>
+            <div class="label"><label for="add-text-title">タイトル</label></div>
+            <div class="form"><input type="text" id="add-text-title"></div>
+            <div id="show-add-text-field"></div>
+            <button class="send-btn" id="add-text-btn">追加</button>
+          </fieldset>
+          <button class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
     `;
 

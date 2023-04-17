@@ -492,6 +492,12 @@ main {
   text-align: center;
   opacity: 0;
   transition: all 0.2s;
+  button.modal-close { // extend
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 16pt;
+  }
   .tags_blocks_wrap {
     display: block;
     width: 100%;
@@ -540,6 +546,23 @@ main {
   }
 }
 
+.app-setings-modal {
+  @extend .base-modal-element;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  max-height: unset;
+  height: 100%;
+  //max-height: 80%;
+  //max-width: 700px;
+  //transform-origin: top;
+  //transform: translate( -50%, -50% );
+  .app-seting-element {
+    display: block;
+    position: relative;
+  }
+}
+
 .instance-select-element {
   @extend .base-modal-element;
   bottom: 0;
@@ -574,23 +597,15 @@ main {
   }
 }
 
-.app-setings-modal {
-  @extend .base-modal-element;
-  top: 50%; left: 50%;
-  width: 60%;
-  max-height: 80%;
-  max-width: 700px;
-  transform: translate( -50%, -50% );
-}
-
 .add-bookmark-modal {
   @extend .base-modal-element;
-  top: 100px;
+  top: 25%;
   left: 50%;
   width: 60%;
   max-width: 760px;
   text-align: center;
-  transform: translate(-50%, -20%);
+  transform-origin: top;
+  transform: translate(-50%, -50%);
   h2 {
     margin-bottom: 15px;
   }
@@ -598,19 +613,21 @@ main {
 
 .add-rss-feed-modal {
   @extend .base-modal-element;
-  top: 100px;
+  top: 25%;
   left: 50%;
   width: 60%;
   max-width: 760px;
-  transform: translate(-50%, -20%);
+  transform-origin: top;
+  transform: translate(-50%, -50%);
 }
 
 .add-text-modal {
   @extend .base-modal-element;
-  top: 60px;
+  top: 25%;
   left: 50%;
   width: 75%;
-  transform: translate(-50%, -20%);
+  transform-origin: top;
+  transform: translate(-50%, -50%);
   div#show-add-text-field {
     flex-basis: 100%;
     margin-top: 10px;
@@ -635,11 +652,13 @@ main {
     transform: translateY(0%);
     opacity: 1;
   }
-  + .app-setings-modal,
   + .add-bookmark-modal,
   + .add-rss-feed-modal,
   + .add-text-modal {
-    transform: translateX(-50%);
+    top: 40%;
+    opacity: 1;
+  }
+  + .app-setings-modal {
     opacity: 1;
   }
 }

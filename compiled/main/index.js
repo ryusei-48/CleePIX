@@ -30834,7 +30834,9 @@ const CleePIXMain = {
   Windows: {},
   storage: {},
   configTemp: {},
-  config: new Store({ encryptionKey: "ymzkrk33" }),
+  config: new Store(
+    /*{ encryptionKey: 'ymzkrk33' }*/
+  ),
   run: function() {
     if (this.config.size === 0) {
       this.config.store = {
@@ -30862,11 +30864,6 @@ const CleePIXMain = {
       });
     });
     electron.ipcMain.handle("get-config", () => {
-      return this.config.store;
-    });
-    electron.ipcMain.handle("config-update", (_2, config) => {
-      this.configTemp = config;
-      this.config.store = this.configTemp;
       return this.config.store;
     });
     electron.ipcMain.handle("bookmark-file", () => {
@@ -30902,9 +30899,14 @@ const CleePIXMain = {
         }
       });
     });
+    electron.ipcMain.on("set-ite-id-cache", (_2, id) => {
+      this.configTemp.cache.currentInstanceId = id;
+      this.config.set("cache", this.configTemp.cache);
+    });
     electron.ipcMain.handle("set-tag-tree-cache", (_2, domString) => {
       this.configTemp.cache.tagTreeDomStrings = domString;
-      this.config.store = this.configTemp;
+      this.config.set("cache", this.configTemp.cache);
+      this.configUpdate();
     });
     electron.ipcMain.handle("add-instance", () => {
       this.configTemp.instance = this.configTemp.instance?.sort((a, b) => {
@@ -30914,8 +30916,8 @@ const CleePIXMain = {
       const newInstance = { label: "new instance", id: newId, path: STORAGE_PATH + `/ite_${randomString()}.db` };
       this.configTemp.instance?.push(newInstance);
       this.initializeDB(newInstance);
-      this.config.store = this.configTemp;
-      this.Windows.main?.webContents.send("instance-update", this.config.store.instance);
+      this.config.set("instance", this.configTemp.instance);
+      this.configUpdate();
       return newInstance;
     });
     electron.ipcMain.on("remove-instance", (_2, id) => {
@@ -30932,12 +30934,11 @@ const CleePIXMain = {
       });
       this.storage[instanceId].db?.close();
       fs.unlink(instancePath, (e) => {
-        console.log(e);
         if (e === null) {
           delete this.storage[instanceId];
           this.configTemp.instance?.splice(indexTemp, 1);
-          this.config.store = this.configTemp;
-          this.Windows.main?.webContents.send("ite-change", this.config.store);
+          this.config.set("instance", this.configTemp.instance);
+          this.configUpdate();
         }
       });
     });
@@ -31183,6 +31184,9 @@ const CleePIXMain = {
       window2.loadFile(path.join(__dirname, "../renderer/index.html"));
     }
     return window2;
+  },
+  configUpdate: function() {
+    this.Windows.main?.webContents.send("config-update", this.config.store);
   }
 };
 function randomString(len = 10) {

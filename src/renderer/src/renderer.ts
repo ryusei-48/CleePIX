@@ -6,6 +6,9 @@ import "../../preload/index.d";
 import { includeDom } from "./include.dom";
 
 declare global {
+  interface Window {
+    app: typeof CleePIX
+  }
   interface WindowEventMap {
     "ite_change": CustomEvent<{ id: number }>
   }
@@ -98,9 +101,10 @@ export const CleePIX: {
       ?.append(this.liveDom.instancePanel);
     document.getElementById('app')?.append(this.liveDom.base);
 
-    window.electron.ipcRenderer.on('instance-update', (_, ites) => {
-      this.instanceDBs = ites;
-      //window.dispatchEvent(new CustomEvent('ite_change', { detail: CleePIX.currentInstanceId }));
+    window.electron.ipcRenderer.on('config-update', (_, config) => {
+      this.instanceDBs = config.instance;
+      //this.currentInstanceId = config.cache.currentInstanceId;
+      this.config = config;
     });
 
     window.addEventListener('keydown', (e) => {
@@ -134,7 +138,7 @@ export const CleePIX: {
 
       let currentTextInput: HTMLInputElement;
       let textInputList: { [key: string]: HTMLInputElement } = {}
-      const addInstanceLavel = (label: string, id: string): void => {
+      const addInstanceLavel = (label: string, id: string): HTMLInputElement => {
 
         const labelWrap = document.createElement('span');
         labelWrap.classList.add('label-wrap');
@@ -153,8 +157,13 @@ export const CleePIX: {
           if (confirm('インスタンスを削除してもよろしいですか？')) {
             labelWrap.remove();
             delete textInputList[deleteBtn.dataset.id!];
-            CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].remove();
-            delete CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId];
+            CleePIX.liveDom.tagTreePanel[deleteBtn.dataset.id!].remove();
+            delete CleePIX.liveDom.tagTreePanel[deleteBtn.dataset.id!];
+            CleePIX.instanceDBs.forEach( (ite, index) => {
+              if ( ite.id === Number( deleteBtn.dataset.id! ) ) {
+                CleePIX.instanceDBs.splice(index, 1); return;
+              }
+            });
 
             const nextTextInput = Object.values(textInputList).shift()!;
             nextTextInput.click();
@@ -192,8 +201,7 @@ export const CleePIX: {
           CleePIX.config.cache!.currentInstanceId = Number((<HTMLInputElement>e.target).dataset.id);
 
           window.dispatchEvent(new CustomEvent('ite_change', { detail: { id: orldId } }));
-          window.electron.ipcRenderer.invoke('config-update', CleePIX.config)
-            .then(config => { CleePIX.config = config });
+          window.electron.ipcRenderer.send('set-ite-id-cache', Number((<HTMLInputElement>e.target).dataset.id));
 
           currentTextInput = <HTMLInputElement>e.target;
         });
@@ -213,6 +221,8 @@ export const CleePIX: {
         CleePIX.liveDom.addInstance
           .querySelector<HTMLSpanElement>('span.label-group')
           ?.appendChild(labelWrap);
+
+        return textInput;
       }
 
       CleePIX.instanceDBs.forEach(db => {
@@ -224,7 +234,7 @@ export const CleePIX: {
         ?.addEventListener('click', () => {
           window.electron.ipcRenderer.invoke('add-instance')
             .then(res => {
-              addInstanceLavel(res.label, `${res.id}`)
+              addInstanceLavel(res.label, `${res.id}`).click();
             });
         });
 
@@ -423,6 +433,13 @@ export const CleePIX: {
       domPram.addEventListener('keydown', e => {
         if (e.key === 'Escape') instancePanelHide();
       });
+
+      const modalClose = domPram.querySelector<HTMLButtonElement>('button.modal-close');
+      if ( modalClose !== null ) {
+        modalClose.addEventListener('click', () => {
+          instancePanelHide();
+        });
+      }
 
       function instancePanelHide(): void {
 
@@ -986,6 +1003,7 @@ export const CleePIX: {
         }
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].classList.replace('animate__fadeOutRight', 'animate__fadeInLeft');
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].inert = false;
+        console.log(CleePIX.currentInstanceId);
       }, false);
 
       const resizePanelBar = CleePIX.liveDom.instancePanel
@@ -1006,4 +1024,5 @@ export const CleePIX: {
 }
 
 // App init.
+window.app = CleePIX;
 window.addEventListener('DOMContentLoaded', () => { CleePIX.init() });
