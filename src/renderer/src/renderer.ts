@@ -124,6 +124,29 @@ export const CleePIX: {
       '.app-setings-modal-wrap', 'div.app-seting-element'
     );
 
+    this.liveDom.addAppSeting.querySelector<HTMLInputElement>('#import-bookmark')!
+      .addEventListener('change', (e) => {
+        const reader = new FileReader();
+        const files = (<HTMLInputElement>e.target).files;
+        if ( files?.length === 1 ) {
+          const file = files[0];
+          if ( file.type === 'text/html' ) {
+            reader.readAsText(file, 'UTF-8');
+            reader.onerror = () => {
+              alert('ファイルの読み込みに失敗しました。');
+            }
+            reader.onload = () => {
+              window.electron.ipcRenderer.invoke('bookmark-file', {
+                instanceId: CleePIX.currentInstanceId, html: reader.result
+              })
+                .then( (res) => {
+                  console.log(res);
+                })
+            }
+          }
+        }
+      });
+
     CleePIX.liveDom.instancePanel.insertAdjacentElement('afterend', this.liveDom.addAppSeting);
   },
 

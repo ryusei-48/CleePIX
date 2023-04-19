@@ -6,7 +6,7 @@ import fs from "fs";
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
 import * as cheerio from 'cheerio';
-import { parseByPath } from "bookmark-file-parser";
+import { parseByString, IBaseMark } from "bookmark-file-parser";
 
 export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
@@ -74,9 +74,69 @@ const CleePIXMain: {
       return this.config.store;
     });
 
-    ipcMain.handle('bookmark-file', () => {
-      const bookmarks = parseByPath('./bookmarks_2023_04_03_vivaldi.html');
-      return bookmarks;
+    ipcMain.handle('bookmark-file', (_, dataString) => {
+      const bookmarks = parseByString(dataString.html);
+      let results: boolean = false;
+      if ( bookmarks.length > 0 ) {
+        const importBookmarks = ( bookmarks: IBaseMark[], parentTagId: number | bigint = 0 ) => {
+          bookmarks.forEach( item => {
+            try {
+              if ( item.type === 'folder' ) {
+                let tagId: number | bigint = 0;
+                const selectedTag = selectTagsTable.get( item.name );
+                if ( selectedTag !== undefined ) {
+                  const selectedTagStructure = selectTagsStructureTable.get( parentTagId, selectedTag.id );
+                  tagId = selectedTag.id;
+                  if ( selectedTagStructure === undefined ) {
+                    insertTagStructureTable.run( parentTagId, selectedTag.id );
+                  }
+                }else {
+                  const insertedTag = insertTagTable.run( item.name );
+                  tagId = insertedTag.lastInsertRowid;
+                  if ( insertedTag.changes === 1 ) {
+                    insertTagStructureTable.run( parentTagId, insertedTag.lastInsertRowid );
+                  }
+                }
+                if ( item.children.length > 0 ) {
+                  importBookmarks( item.children, tagId );
+                }
+              }else if ( item.type === 'site' ) {
+                const selectedBookmark = selectBookmarksTable.get( item.href );
+                if ( selectedBookmark !== undefined ) {
+                  const selectedTagBookmark = selectBookmarkTagsTable.get( parentTagId, selectedBookmark.id );
+                  if ( selectedTagBookmark === undefined ) {
+                    insertBookmarkTagsTable.run( parentTagId, selectedBookmark.id );
+                  }
+                }else {
+                  const insertedBookmark = insertBookmarkTabale.run( item.name, item.href );
+                  if ( insertedBookmark.changes === 1 ) {
+                    insertBookmarkTagsTable.run( parentTagId, insertedBookmark.lastInsertRowid );
+                  }
+                }
+              }
+              results = true;
+            }catch ( e ) { console.log(e); results = false; }
+          });
+        }
+        const selectTagsTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`SELECT * FROM tags WHERE name = ?`);
+        const insertTagTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`INSERT INTO tags ( name ) VALUES ( ? )`);
+        const selectTagsStructureTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`SELECT * FROM tags_structure WHERE parent_id = ? AND child_id = ?`);
+        const insertTagStructureTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`);
+        const selectBookmarksTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`SELECT * FROM bookmarks WHERE url = ?`);
+        const insertBookmarkTabale = this.storage[ dataString.instanceId ].db!
+            .prepare(`INSERT INTO bookmarks ( title, url ) VALUES ( ?, ? )`);
+        const selectBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
+        const insertBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
+            .prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
+        importBookmarks( bookmarks );
+      }
+      return results;
     });
 
     ipcMain.on('window-close', () => {
@@ -289,9 +349,9 @@ const CleePIXMain: {
       //this.storage.main.pragma("key='ymzkrk33'");
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "bookmarks" (
-          "id"	INTEGER NOT NULL UNIQUE,
+          "id"	INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
           "title"	TEXT NOT NULL, "description"	TEXT,
-          "data"	TEXT NOT NULL, "thunb"	TEXT NOT NULL,
+          "data"	TEXT, "thunb"	TEXT,
           "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
           "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
           PRIMARY KEY("id" AUTOINCREMENT)
