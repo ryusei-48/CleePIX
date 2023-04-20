@@ -59,10 +59,13 @@ const CleePIXMain = {
           CleePIXMain.createWindowInstance();
       });
     });
+    this.config.onDidAnyChange(() => {
+      this.Windows.main?.webContents.send("config-update", this.config.store);
+    });
     electron.ipcMain.handle("get-config", () => {
       return this.config.store;
     });
-    electron.ipcMain.handle("bookmark-file", (_, dataString) => {
+    electron.ipcMain.handle("bookmark-file", async (_, dataString) => {
       const bookmarks = bookmarkFileParser.parseByString(dataString.html);
       let results = false;
       if (bookmarks.length > 0) {
@@ -72,13 +75,13 @@ const CleePIXMain = {
               if (item.type === "folder") {
                 let tagId = 0;
                 const selectedTag = selectTagsTable.get(item.name);
-                if (selectedTag !== void 0) {
+                if (selectedTag !== void 0 && parentTagId != selectedTag.id) {
                   const selectedTagStructure = selectTagsStructureTable.get(parentTagId, selectedTag.id);
                   tagId = selectedTag.id;
                   if (selectedTagStructure === void 0) {
                     insertTagStructureTable.run(parentTagId, selectedTag.id);
                   }
-                } else {
+                } else if (selectedTag === void 0) {
                   const insertedTag = insertTagTable.run(item.name);
                   tagId = insertedTag.lastInsertRowid;
                   if (insertedTag.changes === 1) {
@@ -96,7 +99,11 @@ const CleePIXMain = {
                     insertBookmarkTagsTable.run(parentTagId, selectedBookmark.id);
                   }
                 } else {
-                  const insertedBookmark = insertBookmarkTabale.run(item.name, item.href);
+                  let pageType = "general";
+                  if (item.href.match(/^https:\/\/www\.youtube\.com\/watch\?v=/)) {
+                    pageType = "youtube";
+                  }
+                  const insertedBookmark = insertBookmarkTabale.run(item.name, item.href, pageType);
                   if (insertedBookmark.changes === 1) {
                     insertBookmarkTagsTable.run(parentTagId, insertedBookmark.lastInsertRowid);
                   }
@@ -114,7 +121,7 @@ const CleePIXMain = {
         const selectTagsStructureTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM tags_structure WHERE parent_id = ? AND child_id = ?`);
         const insertTagStructureTable = this.storage[dataString.instanceId].db.prepare(`INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`);
         const selectBookmarksTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM bookmarks WHERE url = ?`);
-        const insertBookmarkTabale = this.storage[dataString.instanceId].db.prepare(`INSERT INTO bookmarks ( title, url ) VALUES ( ?, ? )`);
+        const insertBookmarkTabale = this.storage[dataString.instanceId].db.prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
         const selectBookmarkTagsTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
         const insertBookmarkTagsTable = this.storage[dataString.instanceId].db.prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
         importBookmarks(bookmarks);
@@ -157,7 +164,6 @@ const CleePIXMain = {
     electron.ipcMain.handle("set-tag-tree-cache", (_, domString) => {
       this.configTemp.cache.tagTreeDomStrings = domString;
       this.config.set("cache", this.configTemp.cache);
-      this.configUpdate();
     });
     electron.ipcMain.handle("add-instance", () => {
       this.configTemp.instance = this.configTemp.instance?.sort((a, b) => {
@@ -168,7 +174,6 @@ const CleePIXMain = {
       this.configTemp.instance?.push(newInstance);
       this.initializeDB(newInstance);
       this.config.set("instance", this.configTemp.instance);
-      this.configUpdate();
       return newInstance;
     });
     electron.ipcMain.on("remove-instance", (_, id) => {
@@ -189,7 +194,6 @@ const CleePIXMain = {
           delete this.storage[instanceId];
           this.configTemp.instance?.splice(indexTemp, 1);
           this.config.set("instance", this.configTemp.instance);
-          this.configUpdate();
         }
       });
     });
@@ -320,11 +324,12 @@ const CleePIXMain = {
       this.storage[storage.id].db = new Database(storage.path);
       this.storage[storage.id].db.prepare(
         `CREATE TABLE "bookmarks" (
-          "id"	INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
+          "id" INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
           "title"	TEXT NOT NULL, "description"	TEXT,
-          "data"	TEXT, "thunb"	TEXT,
-          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "data" TEXT, "thunb" TEXT, "memo" TEXT,
+          "type" TEXT NOT NULL DEFAULT 'general',
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
@@ -333,8 +338,8 @@ const CleePIXMain = {
           "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
           "font_color"	TEXT NOT NULL DEFAULT '#c6c4be',
           "bg_color"	TEXT NOT NULL DEFAULT 'gray',
-          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
@@ -435,9 +440,6 @@ const CleePIXMain = {
       window.loadFile(path.join(__dirname, "../renderer/index.html"));
     }
     return window;
-  },
-  configUpdate: function() {
-    this.Windows.main?.webContents.send("config-update", this.config.store);
   }
 };
 function randomString(len = 10) {

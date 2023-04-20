@@ -7,6 +7,7 @@ import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
 import * as cheerio from 'cheerio';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
+import { Worker } from "worker_threads";
 
 export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
@@ -26,7 +27,6 @@ const CleePIXMain: {
   config: Store<storeConfig>, configTemp: storeConfig,
   run: () => void, initializeDB: (storage: { label: string, id: number, path: string }) => void,
   createWindowInstance: () => BrowserWindow,
-  configUpdate: () => void
 
 } = {
 
@@ -66,15 +66,15 @@ const CleePIXMain: {
       });
     });
 
-    /*this.config.onDidAnyChange((e) => {
-      console.log(e);
-    });*/
+    this.config.onDidAnyChange(() => {
+      this.Windows.main?.webContents.send('config-update', this.config.store);
+    });
 
     ipcMain.handle('get-config', () => {
       return this.config.store;
     });
 
-    ipcMain.handle('bookmark-file', (_, dataString) => {
+    ipcMain.handle('bookmark-file', async (_, dataString) => {
       const bookmarks = parseByString(dataString.html);
       let results: boolean = false;
       if ( bookmarks.length > 0 ) {
@@ -84,13 +84,13 @@ const CleePIXMain: {
               if ( item.type === 'folder' ) {
                 let tagId: number | bigint = 0;
                 const selectedTag = selectTagsTable.get( item.name );
-                if ( selectedTag !== undefined ) {
+                if ( selectedTag !== undefined && parentTagId != selectedTag.id ) {
                   const selectedTagStructure = selectTagsStructureTable.get( parentTagId, selectedTag.id );
                   tagId = selectedTag.id;
                   if ( selectedTagStructure === undefined ) {
                     insertTagStructureTable.run( parentTagId, selectedTag.id );
                   }
-                }else {
+                }else if ( selectedTag === undefined ) {
                   const insertedTag = insertTagTable.run( item.name );
                   tagId = insertedTag.lastInsertRowid;
                   if ( insertedTag.changes === 1 ) {
@@ -108,7 +108,11 @@ const CleePIXMain: {
                     insertBookmarkTagsTable.run( parentTagId, selectedBookmark.id );
                   }
                 }else {
-                  const insertedBookmark = insertBookmarkTabale.run( item.name, item.href );
+                  let pageType: string = "general";
+                  if ( item.href.match(/^https:\/\/www\.youtube\.com\/watch\?v=/) ) {
+                    pageType = "youtube";
+                  }
+                  const insertedBookmark = insertBookmarkTabale.run( item.name, item.href, pageType );
                   if ( insertedBookmark.changes === 1 ) {
                     insertBookmarkTagsTable.run( parentTagId, insertedBookmark.lastInsertRowid );
                   }
@@ -129,7 +133,7 @@ const CleePIXMain: {
         const selectBookmarksTable = this.storage[ dataString.instanceId ].db!
             .prepare(`SELECT * FROM bookmarks WHERE url = ?`);
         const insertBookmarkTabale = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO bookmarks ( title, url ) VALUES ( ?, ? )`);
+            .prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
         const selectBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
             .prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
         const insertBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
@@ -182,7 +186,6 @@ const CleePIXMain: {
     ipcMain.handle('set-tag-tree-cache', (_, domString) => {
       this.configTemp.cache!.tagTreeDomStrings = domString;
       this.config.set('cache', this.configTemp.cache);
-      this.configUpdate();
     });
 
     ipcMain.handle('add-instance', () => {
@@ -196,8 +199,6 @@ const CleePIXMain: {
       this.initializeDB(newInstance);
       //this.config.store = this.configTemp;
       this.config.set('instance', this.configTemp.instance);
-
-      this.configUpdate();
 
       return newInstance;
     });
@@ -220,7 +221,6 @@ const CleePIXMain: {
           delete this.storage[instanceId];
           this.configTemp.instance?.splice(indexTemp, 1);
           this.config.set( 'instance', this.configTemp.instance );
-          this.configUpdate();
         }
       });
     });
@@ -349,11 +349,12 @@ const CleePIXMain: {
       //this.storage.main.pragma("key='ymzkrk33'");
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "bookmarks" (
-          "id"	INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
+          "id" INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
           "title"	TEXT NOT NULL, "description"	TEXT,
-          "data"	TEXT, "thunb"	TEXT,
-          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "data" TEXT, "thunb" TEXT, "memo" TEXT,
+          "type" TEXT NOT NULL DEFAULT 'general',
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
@@ -362,8 +363,8 @@ const CleePIXMain: {
           "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
           "font_color"	TEXT NOT NULL DEFAULT '#c6c4be',
           "bg_color"	TEXT NOT NULL DEFAULT 'gray',
-          "register_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
-          "update_time"	TEXT NOT NULL DEFAULT '2023-03-05 06:00:00',
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
@@ -454,11 +455,6 @@ const CleePIXMain: {
     }
 
     return window;
-  },
-
-  configUpdate: function () {
-
-    this.Windows.main?.webContents.send('config-update', this.config.store);
   }
 }
 
@@ -475,5 +471,18 @@ function randomString(len: number = 10): string {
   return result;
 }
 
+function getStrDatetime() {
+
+  const date = new Date();
+
+  const y = date.getFullYear();
+  const m = ('0' + (date.getMonth() + 1)).slice(-2);
+  const d = ('0' + date.getDate()).slice(-2);
+  const h = ('0' + date.getHours()).slice(-2);
+  const mi = ('0' + date.getMinutes()).slice(-2);
+  const s = ('0' + date.getSeconds()).slice(-2);
+
+  return y + '-' + m + '-' + d + ' ' + h + ':' + mi + ':' + s;
+}
 
 CleePIXMain.run();
