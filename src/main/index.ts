@@ -1,31 +1,49 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import {app, shell, BrowserWindow, ipcMain} from 'electron';
 import Store from 'electron-store';
-import { join } from 'path'
-import fs from "fs";
+import {join, resolve} from 'path';
+import fs, {promises} from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../build/icon.png?asset'
+import icon from '../../build/icon.png?asset';
 import Database from "better-sqlite3-multiple-ciphers";
 import * as cheerio from 'cheerio';
-import { parseByString, IBaseMark } from "bookmark-file-parser";
-import { Worker } from "worker_threads";
+import {parseByString, IBaseMark} from "bookmark-file-parser";
+import { Database as esqlite, OPEN_FLAGS, version } from "esqlite";
 
 export type storeConfig = {
-  instance?: { label: string, id: number, path: string }[],
+  instance?: {label: string, id: number, path: string;}[],
   cache?: {
     currentInstanceId: number,
-    tagTreeDomStrings: { [key: number]: string } | null
-  }
-}
+    tagTreeDomStrings: {[key: number]: string;} | null;
+  };
+};
 
 const USER_DATA_PATH = app.getPath('userData');
 const STORAGE_PATH = USER_DATA_PATH + '/storage/database';
 
+const db = new esqlite(STORAGE_PATH + '/test.db');
+db.open();
+/*db.query(`PRAGMA key = 'ymzkrk33'`, (err) => {
+  if (err) throw err;
+  db.query(`CREATE TABLE tags ( name TEXT NOT NULL )`);
+  db.query(`INSERT INTO tags( name ) VALUES( "テスト" )`);
+  db.query(`SELECT * FROM tags`, ( _, rows ) => { console.dir(rows, { deps: null }) });
+  // ... and eventually close the database
+});*/
+//db.query(`CREATE TABLE tags ( name TEXT NOT NULL )`);
+db.query(`INSERT INTO tags( name ) VALUES( ? )`, ["こんにちは。"]);
+db.query(`SELECT * FROM tags`, ( _, rows ) => { console.dir(rows, { deps: null }) });
+console.dir(version, { deps: null });
+setTimeout(() => {
+  db.close();
+}, 4000);
+
 const CleePIXMain: {
 
-  Windows: { main?: BrowserWindow },
-  storage: { [key: number]: { db?: Database.Database, stmt?: { [key: string]: Database.Statement } } },
+  Windows: {main?: BrowserWindow;},
+  storage: {[key: number]: {db?: esqlite, stmt?: {[key: string]: esqlite }}},
   config: Store<storeConfig>, configTemp: storeConfig,
-  run: () => void, initializeDB: (storage: { label: string, id: number, path: string }) => void,
+  run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
+  databaseQuery: ( instanceId: number, sql: string, values: ( string | number )[] ) => Promise<unknown>,
   createWindowInstance: () => BrowserWindow,
 
 } = {
@@ -45,8 +63,8 @@ const CleePIXMain: {
           label: 'main', id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
         }],
-        cache: { currentInstanceId: 1, tagTreeDomStrings: null }
-      }
+        cache: {currentInstanceId: 1, tagTreeDomStrings: null}
+      };
     }
 
     this.configTemp = this.config.store;
@@ -77,68 +95,68 @@ const CleePIXMain: {
     ipcMain.handle('bookmark-file', async (_, dataString) => {
       const bookmarks = parseByString(dataString.html);
       let results: boolean = false;
-      if ( bookmarks.length > 0 ) {
-        const importBookmarks = ( bookmarks: IBaseMark[], parentTagId: number | bigint = 0 ) => {
-          bookmarks.forEach( item => {
+      if (bookmarks.length > 0) {
+        const importBookmarks = (bookmarks: IBaseMark[], parentTagId: number | bigint = 0) => {
+          bookmarks.forEach(item => {
             try {
-              if ( item.type === 'folder' ) {
+              if (item.type === 'folder') {
                 let tagId: number | bigint = 0;
-                const selectedTag = selectTagsTable.get( item.name );
-                if ( selectedTag !== undefined && parentTagId != selectedTag.id ) {
-                  const selectedTagStructure = selectTagsStructureTable.get( parentTagId, selectedTag.id );
+                const selectedTag = selectTagsTable.get(item.name);
+                if (selectedTag !== undefined && parentTagId != selectedTag.id) {
+                  const selectedTagStructure = selectTagsStructureTable.get(parentTagId, selectedTag.id);
                   tagId = selectedTag.id;
-                  if ( selectedTagStructure === undefined ) {
-                    insertTagStructureTable.run( parentTagId, selectedTag.id );
+                  if (selectedTagStructure === undefined) {
+                    insertTagStructureTable.run(parentTagId, selectedTag.id);
                   }
-                }else if ( selectedTag === undefined ) {
-                  const insertedTag = insertTagTable.run( item.name );
+                } else if (selectedTag === undefined) {
+                  const insertedTag = insertTagTable.run(item.name);
                   tagId = insertedTag.lastInsertRowid;
-                  if ( insertedTag.changes === 1 ) {
-                    insertTagStructureTable.run( parentTagId, insertedTag.lastInsertRowid );
+                  if (insertedTag.changes === 1) {
+                    insertTagStructureTable.run(parentTagId, insertedTag.lastInsertRowid);
                   }
                 }
-                if ( item.children.length > 0 ) {
-                  importBookmarks( item.children, tagId );
+                if (item.children.length > 0) {
+                  importBookmarks(item.children, tagId);
                 }
-              }else if ( item.type === 'site' ) {
-                const selectedBookmark = selectBookmarksTable.get( item.href );
-                if ( selectedBookmark !== undefined ) {
-                  const selectedTagBookmark = selectBookmarkTagsTable.get( parentTagId, selectedBookmark.id );
-                  if ( selectedTagBookmark === undefined ) {
-                    insertBookmarkTagsTable.run( parentTagId, selectedBookmark.id );
+              } else if (item.type === 'site') {
+                const selectedBookmark = selectBookmarksTable.get(item.href);
+                if (selectedBookmark !== undefined) {
+                  const selectedTagBookmark = selectBookmarkTagsTable.get(parentTagId, selectedBookmark.id);
+                  if (selectedTagBookmark === undefined) {
+                    insertBookmarkTagsTable.run(parentTagId, selectedBookmark.id);
                   }
-                }else {
+                } else {
                   let pageType: string = "general";
-                  if ( item.href.match(/^https:\/\/www\.youtube\.com\/watch\?v=/) ) {
+                  if (item.href.match(/^https:\/\/www\.youtube\.com\/watch\?v=/)) {
                     pageType = "youtube";
                   }
-                  const insertedBookmark = insertBookmarkTabale.run( item.name, item.href, pageType );
-                  if ( insertedBookmark.changes === 1 ) {
-                    insertBookmarkTagsTable.run( parentTagId, insertedBookmark.lastInsertRowid );
+                  const insertedBookmark = insertBookmarkTabale.run(item.name, item.href, pageType);
+                  if (insertedBookmark.changes === 1) {
+                    insertBookmarkTagsTable.run(parentTagId, insertedBookmark.lastInsertRowid);
                   }
                 }
               }
               results = true;
-            }catch ( e ) { console.log(e); results = false; }
+            } catch (e) {console.log(e); results = false;}
           });
-        }
-        const selectTagsTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM tags WHERE name = ?`);
-        const insertTagTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO tags ( name ) VALUES ( ? )`);
-        const selectTagsStructureTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM tags_structure WHERE parent_id = ? AND child_id = ?`);
-        const insertTagStructureTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`);
-        const selectBookmarksTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM bookmarks WHERE url = ?`);
-        const insertBookmarkTabale = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
-        const selectBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
-        const insertBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
-        importBookmarks( bookmarks );
+        };
+        const selectTagsTable = this.storage[dataString.instanceId].db!
+          .prepare(`SELECT * FROM tags WHERE name = ?`);
+        const insertTagTable = this.storage[dataString.instanceId].db!
+          .prepare(`INSERT INTO tags ( name ) VALUES ( ? )`);
+        const selectTagsStructureTable = this.storage[dataString.instanceId].db!
+          .prepare(`SELECT * FROM tags_structure WHERE parent_id = ? AND child_id = ?`);
+        const insertTagStructureTable = this.storage[dataString.instanceId].db!
+          .prepare(`INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`);
+        const selectBookmarksTable = this.storage[dataString.instanceId].db!
+          .prepare(`SELECT * FROM bookmarks WHERE url = ?`);
+        const insertBookmarkTabale = this.storage[dataString.instanceId].db!
+          .prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
+        const selectBookmarkTagsTable = this.storage[dataString.instanceId].db!
+          .prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
+        const insertBookmarkTagsTable = this.storage[dataString.instanceId].db!
+          .prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
+        importBookmarks(bookmarks);
       }
       return results;
     });
@@ -165,7 +183,7 @@ const CleePIXMain: {
     // explicitly with Cmd + Q.
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
-        app.quit()
+        app.quit();
       }
     });
 
@@ -194,7 +212,7 @@ const CleePIXMain: {
       });
 
       const newId: number = this.configTemp.instance!.slice(-1)[0].id + 1;
-      const newInstance = { label: 'new instance', id: newId, path: STORAGE_PATH + `/ite_${randomString()}.db` };
+      const newInstance = {label: 'new instance', id: newId, path: STORAGE_PATH + `/ite_${randomString()}.db`};
       this.configTemp.instance?.push(newInstance);
       this.initializeDB(newInstance);
       //this.config.store = this.configTemp;
@@ -220,7 +238,7 @@ const CleePIXMain: {
         if (e === null) {
           delete this.storage[instanceId];
           this.configTemp.instance?.splice(indexTemp, 1);
-          this.config.set( 'instance', this.configTemp.instance );
+          this.config.set('instance', this.configTemp.instance);
         }
       });
     });
@@ -243,7 +261,7 @@ const CleePIXMain: {
       try {
         res = this.storage[query.instanceId].db?.prepare(
           `SELECT * FROM tags WHERE name = ?`)!.get(query.name);
-        child_id = res === undefined ? 0 : (<any>res!).id;
+        child_id = res === undefined ? 0 : (<any> res!).id;
         if (res === undefined) {
 
           res = this.storage[query.instanceId].db!.prepare(
@@ -255,7 +273,7 @@ const CleePIXMain: {
           `INSERT INTO tags_structure (parent_id, child_id) VALUES ( ?, ? )`
         ).run(query.parentTagId !== null ? query.parentTagId : 0, child_id);
         return res;
-      } catch (e) { console.log(e); return null; }
+      } catch (e) {console.log(e); return null;}
     });
 
     ipcMain.handle('update-tag-name', (_, query) => {
@@ -268,7 +286,7 @@ const CleePIXMain: {
             `UPDATE tags SET name = ? WHERE id = ?`)!.run(query.name, query.tagId);
         }
         return res;
-      } catch (e) { console.log(e); return null; }
+      } catch (e) {console.log(e); return null;}
     });
 
     ipcMain.handle('get-tag-tree', async (_, id) => {
@@ -284,7 +302,7 @@ const CleePIXMain: {
             }
           });
         });
-      } catch (e) { res = null }
+      } catch (e) {res = null;}
       return editres;
     });
 
@@ -292,11 +310,11 @@ const CleePIXMain: {
       const tagsStructure = this.storage[res.instanceId].db
         ?.prepare(`SELECT * FROM tags_structure WHERE parent_id = ?`);
       const tags = this.storage[res.instanceId].db
-        ?.prepare(`SELECT * FROM tags WHERE id = ?`)
-      const tagsRes: any[] = []
+        ?.prepare(`SELECT * FROM tags WHERE id = ?`);
+      const tagsRes: any[] = [];
       tagsStructure?.all(res.parentId).forEach(structure => {
         tagsRes.push(tags?.get(structure.child_id));
-      })
+      });
       return tagsRes;
     });
 
@@ -311,7 +329,7 @@ const CleePIXMain: {
         if (delRes.changes === 1 && setRes.changes === 1) {
           return true;
         } else return false;
-      } catch (e) { console.log(e); return false; }
+      } catch (e) {console.log(e); return false;}
     });
 
     ipcMain.handle('get-http-request', async (_, url) => {
@@ -329,15 +347,15 @@ const CleePIXMain: {
         return {
           title: $('title').text(), description,
           image: $(`meta[property='og:image']`).attr('content')
-        }
+        };
       } else return null;
     });
   },
 
   initializeDB: function (storage) {
 
-    this.storage[storage.id] = {}
-    this.storage[storage.id].stmt = {}
+    this.storage[storage.id] = {};
+    this.storage[storage.id].stmt = {};
     if (fs.existsSync(STORAGE_PATH) && fs.existsSync(storage.path)) {
       this.storage[storage.id].db = new Database(storage.path); return;
     }
@@ -412,14 +430,25 @@ const CleePIXMain: {
           `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
         ).run(6, i);
       }
-    }
+    };
 
     if (!fs.existsSync(STORAGE_PATH)) {
       fs.mkdir(STORAGE_PATH, (err) => {
-        if (err === null) { initDB() }
+        if (err === null) {initDB()}
       });
     } else initDB();
 
+  },
+
+  databaseQuery: function ( instanceId, sql, valuew ) {
+
+    return new Promise(( resolve, reject ) => {
+      this.storage[ instanceId ].db?.query(sql, valuew, ( err, result ) => {
+        if ( err ) {
+          reject( err );
+        }else resolve( result );
+      });
+    });
   },
 
   createWindowInstance: function () {
@@ -430,33 +459,33 @@ const CleePIXMain: {
       show: false, frame: false,
       autoHideMenuBar: true,
       backgroundColor: "#0f0f0f",
-      ...(process.platform === 'linux' ? { icon } : {}),
+      ...(process.platform === 'linux' ? {icon} : {}),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false, webviewTag: true
       }
-    })
+    });
 
     window.on('ready-to-show', () => {
-      window.show()
-    })
+      window.show();
+    });
 
     window.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url)
-      return { action: 'deny' }
-    })
+      shell.openExternal(details.url);
+      return {action: 'deny'};
+    });
 
     // HMR for renderer base on electron-vite cli.
     // Load the remote URL for development or the local html file for production.
     if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-      window.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      window.loadURL(process.env['ELECTRON_RENDERER_URL']);
     } else {
-      window.loadFile(join(__dirname, '../renderer/index.html'))
+      window.loadFile(join(__dirname, '../renderer/index.html'));
     }
 
     return window;
   }
-}
+};
 
 function randomString(len: number = 10): string {
 

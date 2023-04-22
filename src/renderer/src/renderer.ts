@@ -786,7 +786,7 @@ export const CleePIX: {
 
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
-              insertAttrTreeItem(isRoot, parentId, li, tagNameButton, target!);
+              insertAttrTreeItem(isRoot, parentId, li, tagNameButton);
 
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
@@ -842,16 +842,12 @@ export const CleePIX: {
 
       function insertAttrTreeItem(
         isRoot: boolean, parentTagId: number, targetLi: HTMLLIElement,
-        targetTagNameButton: HTMLButtonElement, readLi: HTMLLIElement
+        targetTagNameButton: HTMLButtonElement
       ) {
         if (isRoot === false) {
-          /*const clickTagNameButton = readLi.querySelector<HTMLButtonElement>('button.tag-name')!;
-          targetTagNameButton.dataset.tagChain =
-            (clickTagNameButton.dataset.tagChain + ',' + parentTagId + ',').replace(/^,|,$/g, '');*/
           targetTagNameButton.dataset.parentTagId = `${parentTagId}`;
           targetLi.dataset.parentTagId = `${parentTagId}`;
         } else {
-          //targetTagNameButton.dataset.tagChain = '';
           targetTagNameButton.dataset.parentTagId = '0';
           targetLi.dataset.parentTagId = '0';
         }
@@ -910,8 +906,7 @@ export const CleePIX: {
                       tagNameButtonList: [tagNameButton],
                       tagMenuButtonList: [tagMenuButton]
                     });
-                    const readLi = <HTMLLIElement> targetUl?.parentElement!;
-                    insertAttrTreeItem(isRoot, tagId!, insertLi, tagNameButton, readLi);
+                    insertAttrTreeItem(isRoot, tagId!, insertLi, tagNameButton);
                     targetUl?.insertAdjacentElement('beforeend', insertLi);
                     if (targetUl!.childElementCount <= 3) {
                       targetUl!.querySelector('li > button[data-tag-id="none"]')

@@ -5,7 +5,7 @@ export const includeDom: {
   instancePanel: () => HTMLDivElement,
   addAppSetings: () => HTMLDivElement,
   addInstance: () => HTMLDivElement,
-  addTagBlock: ( inputId: string | null ) => HTMLDivElement,
+  addTagBlock: ( inputId?: string | null ) => HTMLDivElement,
   addBookmarkSeelector: () => HTMLDivElement,
   addRssFeedSeelector: () => HTMLDivElement,
   addTextSelector: () => HTMLDivElement

@@ -6,6 +6,7 @@ const fs = require("fs");
 const Database = require("better-sqlite3-multiple-ciphers");
 const cheerio = require("cheerio");
 const bookmarkFileParser = require("bookmark-file-parser");
+const esqlite = require("esqlite");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -26,6 +27,16 @@ const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
 const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
 const USER_DATA_PATH = electron.app.getPath("userData");
 const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
+const db = new esqlite.Database(STORAGE_PATH + "/test.db");
+db.open();
+db.query(`INSERT INTO tags( name ) VALUES( ? )`, ["こんにちは。"]);
+db.query(`SELECT * FROM tags`, (_, rows) => {
+  console.dir(rows, { deps: null });
+});
+console.dir(esqlite.version, { deps: null });
+setTimeout(() => {
+  db.close();
+}, 4e3);
 const CleePIXMain = {
   Windows: {},
   storage: {},
@@ -49,8 +60,8 @@ const CleePIXMain = {
       };
     }
     this.configTemp = this.config.store;
-    this.config.store.instance.forEach((db) => {
-      this.initializeDB(db);
+    this.config.store.instance.forEach((db2) => {
+      this.initializeDB(db2);
     });
     electron.app.whenReady().then(() => {
       this.Windows.main = this.createWindowInstance();
