@@ -1,4 +1,26 @@
 "use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 const electron = require("electron");
 const Store = require("electron-store");
 const path = require("path");
@@ -6,6 +28,10 @@ const fs = require("fs");
 const Database = require("better-sqlite3-multiple-ciphers");
 const cheerio = require("cheerio");
 const bookmarkFileParser = require("bookmark-file-parser");
+<<<<<<< Updated upstream
+=======
+const node_worker_threads = require("node:worker_threads");
+>>>>>>> Stashed changes
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -24,6 +50,9 @@ function _interopNamespaceDefault(e) {
 }
 const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
 const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
+function importBookmarksWorker(options) {
+  return new node_worker_threads.Worker(require.resolve("./import_bookmarks.js"), options);
+}
 const USER_DATA_PATH = electron.app.getPath("userData");
 const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
 const CleePIXMain = {
@@ -52,7 +81,7 @@ const CleePIXMain = {
     this.config.store.instance.forEach((db) => {
       this.initializeDB(db);
     });
-    electron.app.whenReady().then(() => {
+    electron.app.whenReady().then(async () => {
       this.Windows.main = this.createWindowInstance();
       electron.app.on("activate", () => {
         if (electron.BrowserWindow.getAllWindows().length === 0)
@@ -67,66 +96,52 @@ const CleePIXMain = {
     });
     electron.ipcMain.handle("bookmark-file", async (_, dataString) => {
       const bookmarks = bookmarkFileParser.parseByString(dataString.html);
-      let results = false;
       if (bookmarks.length > 0) {
-        const importBookmarks = (bookmarks2, parentTagId = 0) => {
-          bookmarks2.forEach((item) => {
-            try {
-              if (item.type === "folder") {
-                let tagId = 0;
-                const selectedTag = selectTagsTable.get(item.name);
-                if (selectedTag !== void 0 && parentTagId != selectedTag.id) {
-                  const selectedTagStructure = selectTagsStructureTable.get(parentTagId, selectedTag.id);
-                  tagId = selectedTag.id;
-                  if (selectedTagStructure === void 0) {
-                    insertTagStructureTable.run(parentTagId, selectedTag.id);
-                  }
-                } else if (selectedTag === void 0) {
-                  const insertedTag = insertTagTable.run(item.name);
-                  tagId = insertedTag.lastInsertRowid;
-                  if (insertedTag.changes === 1) {
-                    insertTagStructureTable.run(parentTagId, insertedTag.lastInsertRowid);
-                  }
-                }
-                if (item.children.length > 0) {
-                  importBookmarks(item.children, tagId);
-                }
-              } else if (item.type === "site") {
-                const selectedBookmark = selectBookmarksTable.get(item.href);
-                if (selectedBookmark !== void 0) {
-                  const selectedTagBookmark = selectBookmarkTagsTable.get(parentTagId, selectedBookmark.id);
-                  if (selectedTagBookmark === void 0) {
-                    insertBookmarkTagsTable.run(parentTagId, selectedBookmark.id);
-                  }
-                } else {
-                  let pageType = "general";
-                  if (item.href.match(/^https:\/\/www\.youtube\.com\/watch\?v=/)) {
-                    pageType = "youtube";
-                  }
-                  const insertedBookmark = insertBookmarkTabale.run(item.name, item.href, pageType);
-                  if (insertedBookmark.changes === 1) {
-                    insertBookmarkTagsTable.run(parentTagId, insertedBookmark.lastInsertRowid);
-                  }
-                }
-              }
-              results = true;
-            } catch (e) {
-              console.log(e);
-              results = false;
-            }
-          });
-        };
-        const selectTagsTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM tags WHERE name = ?`);
-        const insertTagTable = this.storage[dataString.instanceId].db.prepare(`INSERT INTO tags ( name ) VALUES ( ? )`);
-        const selectTagsStructureTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM tags_structure WHERE parent_id = ? AND child_id = ?`);
-        const insertTagStructureTable = this.storage[dataString.instanceId].db.prepare(`INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`);
-        const selectBookmarksTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM bookmarks WHERE url = ?`);
-        const insertBookmarkTabale = this.storage[dataString.instanceId].db.prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
-        const selectBookmarkTagsTable = this.storage[dataString.instanceId].db.prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
-        const insertBookmarkTagsTable = this.storage[dataString.instanceId].db.prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
-        importBookmarks(bookmarks);
+        return await importBookmarks(getInstanceDatabasePath(dataString.instanceId), bookmarks);
+      } else
+        return false;
+      async function importBookmarks(databasePath, bookmarks2) {
+        return new Promise((resolve2) => {
+          if (databasePath) {
+            importBookmarksWorker({
+              workerData: { dbPath: databasePath, bookmarks: bookmarks2 }
+            }).on("message", resolve2);
+          } else
+            resolve2(false);
+        });
       }
-      return results;
+      function getInstanceDatabasePath(instanceId) {
+        let databasePath = null;
+        CleePIXMain.config.store.instance.forEach((ite, index) => {
+          if (ite.id === instanceId) {
+            databasePath = ite.path;
+            return;
+          }
+        });
+        return databasePath;
+      }
+    });
+    electron.ipcMain.handle("get-bookmarks", (_, query) => {
+      if (query.tagIdChain !== null) {
+        try {
+          const bookmarks = this.storage[query.instanceId].db?.prepare(
+            `SELECT * FROM bookmarks
+              JOIN tags_bookmarks AS tbt ON bookmarks.id = tbt.bookmark_id
+              JOIN tags ON tbt.tags_id = tags.id
+              WHERE tags.id IN (${query.tagIdChain.map(() => "?").join(",")})
+              GROUP BY bookmarks.id HAVING COUNT( bookmarks.id ) = ?
+              ORDER BY bookmarks.update_time DESC LIMIT 80`
+          ).all(query.tagIdChain, query.tagIdChain.length);
+          return bookmarks;
+        } catch (e) {
+          console.log(e);
+          return null;
+        }
+      } else {
+        return this.storage[query.instanceId].db?.prepare(
+          `SELECT * FROM bookmarks ORDER BY update_time DESC LIMIT 80`
+        ).all();
+      }
     });
     electron.ipcMain.on("window-close", () => {
       Object.values(this.storage).forEach((value) => {

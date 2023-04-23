@@ -455,11 +455,30 @@ main {
       .contents-panel {
         //flex-basis: calc(100% - 254px);
         flex-grow: 1;
+        flex-basis: 300px;
         min-width: 0;
         flex-direction: row;
         position: relative;
+        height: 100%;
         //max-width: calc( 100% - 350px );
         //border: 1px solid #c6c4be;
+        .content-elements-wrap {
+          display: block;
+          width: 100%;
+          height: 100%;
+          padding: 10px;
+          padding-right: 0;
+          overflow-y: scroll;
+          .content-elements {
+            display: grid;
+            grid-template-columns: 50% 50%;
+            width: 100%;
+            min-height: 100%;
+            .bookmark-item {
+              padding: 10px;
+            }
+          }
+        }
       }
     }
   }

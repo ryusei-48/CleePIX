@@ -30,14 +30,16 @@ export const CleePIX: {
     commonModalWindow: (
       click_id: string, domPram: HTMLDivElement,
       wrapClass: string, focus_id: string | null
-    ) => void, addTagBlock: () => void, tagTreePanel: () => void;
+    ) => void, addTagBlock: () => void, tagTreePanel: () => void,
+    addContents: () => void
   };
   liveDom: {
     base: HTMLDivElement, instancePanel: HTMLDivElement,
     addAppSeting: HTMLDivElement, addInstance: HTMLDivElement,
     addBookmark: HTMLDivElement, addRssFeed: HTMLDivElement,
     addText: HTMLDivElement, addTagBlock: HTMLDivElement,
-    tagTreePanel: {[key: number]: HTMLUListElement;};
+    tagTreePanel: {[key: number]: HTMLUListElement},
+    contentsPanel: {[key: string]: HTMLDivElement}
   };
 
 } = {
@@ -52,7 +54,10 @@ export const CleePIX: {
     addRssFeed: includeDom.addRssFeedSeelector(),
     addText: includeDom.addTextSelector(),
     addTagBlock: includeDom.addTagBlock(),
-    tagTreePanel: {}
+    tagTreePanel: {},
+    contentsPanel: {
+      base: includeDom.contentsPanel.base()
+    }
   },
 
   init: async function () {
@@ -71,6 +76,7 @@ export const CleePIX: {
     this.instancePanelControl.addText();
     this.instancePanelControl.addTagBlock();
     this.instancePanelControl.tagTreePanel();
+    this.instancePanelControl.addContents();
 
     /*const script = document.createElement('script');
     //script.src = "https://platform.twitter.com/widgets.js";
@@ -106,15 +112,6 @@ export const CleePIX: {
       //this.currentInstanceId = config.cache.currentInstanceId;
       this.config = config;
     });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.altKey && e.code === 'KeyL') {
-        window.electron.ipcRenderer.invoke('bookmark-file')
-          .then(data => {
-            console.log(data);
-          });
-      }
-    });
   },
 
   AppSetingPanel: function () {
@@ -139,7 +136,7 @@ export const CleePIX: {
               window.electron.ipcRenderer.invoke('bookmark-file', {
                 instanceId: CleePIX.currentInstanceId, html: reader.result
               }).then( async (res) => {
-                if ( res === true ) {
+                if ( Array.isArray( res ) ) {
                   await window.electron.ipcRenderer.invoke('set-tag-tree-cache', null);
                   window.location.reload();
                 }
@@ -550,13 +547,20 @@ export const CleePIX: {
               if (tmpDom.tagName === 'LI') {
                 if (parentTagId > 0 && tmpDom.dataset.parentTagId !== undefined) {
                   parentTagId = Number(tmpDom.dataset.parentTagId);
-                  tagIdChain.push(parentTagId);
+                  if ( parentTagId > 0 ) tagIdChain.push(parentTagId);
                 }
               }
               tmpDom = <HTMLElement> tmpDom.parentNode;
             }
 
+            tagIdChain.push( Number( button.dataset.tagId ) );
+
             console.log(tagIdChain);
+            window.electron.ipcRenderer
+              .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain })
+              .then(( bookmarks ) => {
+                console.log(bookmarks);
+              });
           });
         });
 
@@ -1028,7 +1032,7 @@ export const CleePIX: {
         }
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].classList.replace('animate__fadeOutRight', 'animate__fadeInLeft');
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].inert = false;
-        console.log(CleePIX.currentInstanceId);
+        //console.log(CleePIX.currentInstanceId);
       }, false);
 
       const resizePanelBar = CleePIX.liveDom.instancePanel
@@ -1044,6 +1048,28 @@ export const CleePIX: {
           document.removeEventListener('mousemove', panelResizing, false);
         }, false);
       });
+    },
+
+    addContents: function () {
+
+      window.electron.ipcRenderer
+        .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain: null })
+        .then(( bookmarks ) => {
+          const insertCe = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div#insert-ce')!;
+          console.log(insertCe)
+          bookmarks.forEach(( bookmark ) => {
+            const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
+            const link = document.createElement('a');
+            link.href = bookmark.url;
+            link.textContent = bookmark.title;
+            link.target = '_blank';
+            bookmarkItem.appendChild( link );
+            insertCe.appendChild( bookmarkItem );
+          });
+        });
+
+      CleePIX.liveDom.instancePanel.querySelector<HTMLDivElement>('div.contents-panel')!
+        .appendChild(CleePIX.liveDom.contentsPanel.base);
     }
   }
 };

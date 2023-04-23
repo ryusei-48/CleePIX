@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
+=======
+import {app, shell, BrowserWindow, ipcMain, Data} from 'electron';
+>>>>>>> Stashed changes
 import Store from 'electron-store';
 import { join } from 'path'
 import fs from "fs";
@@ -6,8 +10,13 @@ import fs from "fs";
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
 import * as cheerio from 'cheerio';
+<<<<<<< Updated upstream
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 import { Worker } from "worker_threads";
+=======
+import {parseByString, IBaseMark} from "bookmark-file-parser";
+import importBookmarksWorker from "./thread-scripts/import-bookmarks?nodeWorker";
+>>>>>>> Stashed changes
 
 export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
@@ -22,10 +31,17 @@ const STORAGE_PATH = USER_DATA_PATH + '/storage/database';
 
 const CleePIXMain: {
 
+<<<<<<< Updated upstream
   Windows: { main?: BrowserWindow },
   storage: { [key: number]: { db?: Database.Database, stmt?: { [key: string]: Database.Statement } } },
   config: Store<storeConfig>, configTemp: storeConfig,
   run: () => void, initializeDB: (storage: { label: string, id: number, path: string }) => void,
+=======
+  Windows: {main?: BrowserWindow;},
+  storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
+  config: Store<storeConfig>, configTemp: storeConfig,
+  run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
+>>>>>>> Stashed changes
   createWindowInstance: () => BrowserWindow,
 
 } = {
@@ -55,7 +71,7 @@ const CleePIXMain: {
       this.initializeDB(db);
     });
 
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
 
       this.Windows.main = this.createWindowInstance();
 
@@ -76,6 +92,7 @@ const CleePIXMain: {
 
     ipcMain.handle('bookmark-file', async (_, dataString) => {
       const bookmarks = parseByString(dataString.html);
+<<<<<<< Updated upstream
       let results: boolean = false;
       if ( bookmarks.length > 0 ) {
         const importBookmarks = ( bookmarks: IBaseMark[], parentTagId: number | bigint = 0 ) => {
@@ -139,8 +156,51 @@ const CleePIXMain: {
         const insertBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
             .prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
         importBookmarks( bookmarks );
+=======
+      if (bookmarks.length > 0) {
+        return await importBookmarks( getInstanceDatabasePath( dataString.instanceId ), bookmarks );
+      }else return false;
+
+      async function importBookmarks( databasePath: string | null, bookmarks: IBaseMark[] ) {
+        return new Promise((resolve) => {
+          if ( databasePath ) {
+            importBookmarksWorker({
+              workerData: { dbPath: databasePath, bookmarks }
+            }).on('message', resolve);
+          }else resolve( false );
+        });
       }
-      return results;
+
+      function getInstanceDatabasePath( instanceId: number ): string | null {
+        let databasePath: string | null = null;
+        CleePIXMain.config.store.instance!.forEach((ite, index) => {
+          if ( ite.id === instanceId ) {
+            databasePath = ite.path; return;
+          }
+        });
+        return databasePath;
+      }
+    });
+
+    ipcMain.handle('get-bookmarks', (_, query) => {
+      if ( query.tagIdChain !== null  ) {
+        try {
+          const bookmarks = this.storage[ query.instanceId ].db?.prepare(
+            `SELECT * FROM bookmarks
+              JOIN tags_bookmarks AS tbt ON bookmarks.id = tbt.bookmark_id
+              JOIN tags ON tbt.tags_id = tags.id
+              WHERE tags.id IN (${ query.tagIdChain.map(() => '?').join(',') })
+              GROUP BY bookmarks.id HAVING COUNT( bookmarks.id ) = ?
+              ORDER BY bookmarks.update_time DESC LIMIT 80`
+          ).all( query.tagIdChain, query.tagIdChain.length );
+          return bookmarks;
+        }catch (e) { console.log(e); return null; }
+      }else {
+        return this.storage[ query.instanceId ].db?.prepare(
+          `SELECT * FROM bookmarks ORDER BY update_time DESC LIMIT 80`
+        ).all();
+>>>>>>> Stashed changes
+      }
     });
 
     ipcMain.on('window-close', () => {
@@ -416,7 +476,11 @@ const CleePIXMain: {
 
     if (!fs.existsSync(STORAGE_PATH)) {
       fs.mkdir(STORAGE_PATH, (err) => {
+<<<<<<< Updated upstream
         if (err === null) { initDB() }
+=======
+        if (err === null) {initDB();}
+>>>>>>> Stashed changes
       });
     } else initDB();
 

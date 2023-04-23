@@ -9,6 +9,12 @@ export default defineConfig({
       //bytecodePlugin({ protectedStrings: [ "ready-to-show" ] })
     ],
     build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, './src/main/index.ts'),
+          import_bookmarks: resolve(__dirname, './src/main/thread-scripts/import-bookmarks.ts')
+        }
+      },
       //minify: true,
       outDir: './compiled/main'
     }
