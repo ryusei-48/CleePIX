@@ -1,22 +1,13 @@
-<<<<<<< Updated upstream
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-=======
 import {app, shell, BrowserWindow, ipcMain, Data} from 'electron';
->>>>>>> Stashed changes
 import Store from 'electron-store';
-import { join } from 'path'
+import { join, resolve } from 'path'
 import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
-import * as cheerio from 'cheerio';
-<<<<<<< Updated upstream
-import { parseByString, IBaseMark } from "bookmark-file-parser";
-import { Worker } from "worker_threads";
-=======
-import {parseByString, IBaseMark} from "bookmark-file-parser";
 import importBookmarksWorker from "./thread-scripts/import-bookmarks?nodeWorker";
->>>>>>> Stashed changes
+import * as cheerio from 'cheerio';
+import { IBaseMark } from "bookmark-file-parser";
 
 export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
@@ -29,20 +20,18 @@ export type storeConfig = {
 const USER_DATA_PATH = app.getPath('userData');
 const STORAGE_PATH = USER_DATA_PATH + '/storage/database';
 
-const CleePIXMain: {
+const CleePIX: {
 
-<<<<<<< Updated upstream
-  Windows: { main?: BrowserWindow },
-  storage: { [key: number]: { db?: Database.Database, stmt?: { [key: string]: Database.Statement } } },
-  config: Store<storeConfig>, configTemp: storeConfig,
-  run: () => void, initializeDB: (storage: { label: string, id: number, path: string }) => void,
-=======
   Windows: {main?: BrowserWindow;},
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
   config: Store<storeConfig>, configTemp: storeConfig,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
->>>>>>> Stashed changes
   createWindowInstance: () => BrowserWindow,
+  shareParts: {
+    getWebpageMetadata: ( url: string ) => Promise<{
+      title: string, description: string, image: string
+    } | null>
+  }
 
 } = {
 
@@ -78,7 +67,7 @@ const CleePIXMain: {
       app.on('activate', () => {
         // On macOS it's common to re-create a window in the app when the
         // dock icon is clicked and there are no other windows open.
-        if (BrowserWindow.getAllWindows().length === 0) CleePIXMain.createWindowInstance();
+        if (BrowserWindow.getAllWindows().length === 0) CleePIX.createWindowInstance();
       });
     });
 
@@ -91,78 +80,14 @@ const CleePIXMain: {
     });
 
     ipcMain.handle('bookmark-file', async (_, dataString) => {
+      const { parseByString } = await import('bookmark-file-parser');
       const bookmarks = parseByString(dataString.html);
-<<<<<<< Updated upstream
-      let results: boolean = false;
-      if ( bookmarks.length > 0 ) {
-        const importBookmarks = ( bookmarks: IBaseMark[], parentTagId: number | bigint = 0 ) => {
-          bookmarks.forEach( item => {
-            try {
-              if ( item.type === 'folder' ) {
-                let tagId: number | bigint = 0;
-                const selectedTag = selectTagsTable.get( item.name );
-                if ( selectedTag !== undefined && parentTagId != selectedTag.id ) {
-                  const selectedTagStructure = selectTagsStructureTable.get( parentTagId, selectedTag.id );
-                  tagId = selectedTag.id;
-                  if ( selectedTagStructure === undefined ) {
-                    insertTagStructureTable.run( parentTagId, selectedTag.id );
-                  }
-                }else if ( selectedTag === undefined ) {
-                  const insertedTag = insertTagTable.run( item.name );
-                  tagId = insertedTag.lastInsertRowid;
-                  if ( insertedTag.changes === 1 ) {
-                    insertTagStructureTable.run( parentTagId, insertedTag.lastInsertRowid );
-                  }
-                }
-                if ( item.children.length > 0 ) {
-                  importBookmarks( item.children, tagId );
-                }
-              }else if ( item.type === 'site' ) {
-                const selectedBookmark = selectBookmarksTable.get( item.href );
-                if ( selectedBookmark !== undefined ) {
-                  const selectedTagBookmark = selectBookmarkTagsTable.get( parentTagId, selectedBookmark.id );
-                  if ( selectedTagBookmark === undefined ) {
-                    insertBookmarkTagsTable.run( parentTagId, selectedBookmark.id );
-                  }
-                }else {
-                  let pageType: string = "general";
-                  if ( item.href.match(/^https:\/\/www\.youtube\.com\/watch\?v=/) ) {
-                    pageType = "youtube";
-                  }
-                  const insertedBookmark = insertBookmarkTabale.run( item.name, item.href, pageType );
-                  if ( insertedBookmark.changes === 1 ) {
-                    insertBookmarkTagsTable.run( parentTagId, insertedBookmark.lastInsertRowid );
-                  }
-                }
-              }
-              results = true;
-            }catch ( e ) { console.log(e); results = false; }
-          });
-        }
-        const selectTagsTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM tags WHERE name = ?`);
-        const insertTagTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO tags ( name ) VALUES ( ? )`);
-        const selectTagsStructureTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM tags_structure WHERE parent_id = ? AND child_id = ?`);
-        const insertTagStructureTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`);
-        const selectBookmarksTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM bookmarks WHERE url = ?`);
-        const insertBookmarkTabale = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
-        const selectBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
-        const insertBookmarkTagsTable = this.storage[ dataString.instanceId ].db!
-            .prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
-        importBookmarks( bookmarks );
-=======
       if (bookmarks.length > 0) {
         return await importBookmarks( getInstanceDatabasePath( dataString.instanceId ), bookmarks );
       }else return false;
 
       async function importBookmarks( databasePath: string | null, bookmarks: IBaseMark[] ) {
-        return new Promise((resolve) => {
+        return new Promise( async (resolve) => {
           if ( databasePath ) {
             importBookmarksWorker({
               workerData: { dbPath: databasePath, bookmarks }
@@ -173,7 +98,7 @@ const CleePIXMain: {
 
       function getInstanceDatabasePath( instanceId: number ): string | null {
         let databasePath: string | null = null;
-        CleePIXMain.config.store.instance!.forEach((ite, index) => {
+        CleePIX.config.store.instance!.forEach((ite, index) => {
           if ( ite.id === instanceId ) {
             databasePath = ite.path; return;
           }
@@ -186,7 +111,7 @@ const CleePIXMain: {
       if ( query.tagIdChain !== null  ) {
         try {
           const bookmarks = this.storage[ query.instanceId ].db?.prepare(
-            `SELECT * FROM bookmarks
+            `SELECT bookmarks.* FROM bookmarks
               JOIN tags_bookmarks AS tbt ON bookmarks.id = tbt.bookmark_id
               JOIN tags ON tbt.tags_id = tags.id
               WHERE tags.id IN (${ query.tagIdChain.map(() => '?').join(',') })
@@ -199,7 +124,6 @@ const CleePIXMain: {
         return this.storage[ query.instanceId ].db?.prepare(
           `SELECT * FROM bookmarks ORDER BY update_time DESC LIMIT 80`
         ).all();
->>>>>>> Stashed changes
       }
     });
 
@@ -375,23 +299,49 @@ const CleePIXMain: {
     });
 
     ipcMain.handle('get-http-request', async (_, url) => {
-      const response = await fetch(url, {
-        method: 'GET',
-        mode: 'no-cors',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
+      return await this.shareParts.getWebpageMetadata( url );
+    });
+
+    ipcMain.handle('set-metadata-all-bookmarks', async (_, instanceId) => {
+      const allBookmarks = this.storage[ instanceId ].db?.prepare(`SELECT * FROM bookmarks`).all();
+      const updateBookmarks = this.storage[ instanceId ].db
+        ?.prepare(`UPDATE bookmarks SET description = ?, thunb = ? WHERE id = ?`);
+      const { fileTypeFromBuffer } = await import('file-type');
+      allBookmarks?.forEach( async ( bookmark ) => {
+        const metadata = await this.shareParts.getWebpageMetadata( bookmark.url );
+        if ( metadata ) {
+          const response = await getWebContent( metadata.image );
+          const imageBlob = await response.blob()
+          const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+          const type = await fileTypeFromBuffer( imageBuffer );
+          updateBookmarks?.run(
+            metadata.description,
+            type && type.mime.match(/^image\//) ? imageBuffer : null, bookmark.id
+          );
         }
       });
-      if (response && response.ok) {
-        const $ = cheerio.load(await response.text());
-        let description = $(`meta[property="og:description"]`).attr('content');
-        if (description === undefined) description = $(`meta[name="description"]`).attr('content');
-        return {
-          title: $('title').text(), description,
-          image: $(`meta[property='og:image']`).attr('content')
-        }
-      } else return null;
+      return true;
     });
+  },
+
+  shareParts: {
+
+    getWebpageMetadata: function ( url ) {
+
+      return new Promise( async (resolve) => {
+
+        const response = await getWebContent( url );
+        if (response && response.ok) {
+          const $ = cheerio.load(await response.text());
+          let description = $(`meta[property="og:description"]`).attr('content');
+          if (description === undefined) description = $(`meta[name="description"]`).attr('content');
+          resolve({
+            title: $('title').text(), description: description ? description : '',
+            image: $(`meta[property='og:image']`).attr('content')!
+          });
+        } else resolve( null );
+      });
+    }
   },
 
   initializeDB: function (storage) {
@@ -411,7 +361,7 @@ const CleePIXMain: {
         `CREATE TABLE "bookmarks" (
           "id" INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
           "title"	TEXT NOT NULL, "description"	TEXT,
-          "data" TEXT, "thunb" TEXT, "memo" TEXT,
+          "data" TEXT, "thunb" BLOB, "memo" TEXT,
           "type" TEXT NOT NULL DEFAULT 'general',
           "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
@@ -476,11 +426,7 @@ const CleePIXMain: {
 
     if (!fs.existsSync(STORAGE_PATH)) {
       fs.mkdir(STORAGE_PATH, (err) => {
-<<<<<<< Updated upstream
-        if (err === null) { initDB() }
-=======
         if (err === null) {initDB();}
->>>>>>> Stashed changes
       });
     } else initDB();
 
@@ -549,4 +495,18 @@ function getStrDatetime() {
   return y + '-' + m + '-' + d + ' ' + h + ':' + mi + ':' + s;
 }
 
-CleePIXMain.run();
+async function getWebContent( url: string ): Promise<Response> {
+
+  return new Promise((resolve) => {
+    fetch( url, {
+      method: 'GET',
+      mode: 'no-cors',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
+      }
+    }).then(resolve);
+  });
+}
+
+// App init
+CleePIX.run();

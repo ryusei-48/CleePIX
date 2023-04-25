@@ -32,7 +32,7 @@ export const CleePIX: {
       wrapClass: string, focus_id: string | null
     ) => void, addTagBlock: () => void, tagTreePanel: () => void,
     addContents: () => void
-  };
+  },
   liveDom: {
     base: HTMLDivElement, instancePanel: HTMLDivElement,
     addAppSeting: HTMLDivElement, addInstance: HTMLDivElement,
@@ -40,7 +40,8 @@ export const CleePIX: {
     addText: HTMLDivElement, addTagBlock: HTMLDivElement,
     tagTreePanel: {[key: number]: HTMLUListElement},
     contentsPanel: {[key: string]: HTMLDivElement}
-  };
+  },
+  shareParts: { getBookmarkItemDom: ( bookmarks: any ) => void }
 
 } = {
 
@@ -83,6 +84,13 @@ export const CleePIX: {
     script.type = 'application/javascript';
     script.src = 'https://embed.nicovideo.jp/watch/sm41943302/script?w=640&h=360';
     document.body.appendChild(script);*/
+
+    window.addEventListener('keydown', (e) => {
+      console.log(e.code);
+      if ( e.ctrlKey && e.shiftKey && e.code === 'KeyA' ) {
+        window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId);
+      }
+    });
 
   },
 
@@ -555,12 +563,9 @@ export const CleePIX: {
 
             tagIdChain.push( Number( button.dataset.tagId ) );
 
-            console.log(tagIdChain);
             window.electron.ipcRenderer
               .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain })
-              .then(( bookmarks ) => {
-                console.log(bookmarks);
-              });
+              .then( CleePIX.shareParts.getBookmarkItemDom );
           });
         });
 
@@ -1054,25 +1059,31 @@ export const CleePIX: {
 
       window.electron.ipcRenderer
         .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain: null })
-        .then(( bookmarks ) => {
-          const insertCe = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div#insert-ce')!;
-          console.log(insertCe)
-          bookmarks.forEach(( bookmark ) => {
-            const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
-            const link = document.createElement('a');
-            link.href = bookmark.url;
-            link.textContent = bookmark.title;
-            link.target = '_blank';
-            bookmarkItem.appendChild( link );
-            insertCe.appendChild( bookmarkItem );
-          });
-        });
+        .then( CleePIX.shareParts.getBookmarkItemDom );
 
       CleePIX.liveDom.instancePanel.querySelector<HTMLDivElement>('div.contents-panel')!
         .appendChild(CleePIX.liveDom.contentsPanel.base);
     }
+  },
+
+  shareParts: {
+
+    getBookmarkItemDom: function ( bookmarks ) {
+
+      const insertCe = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div#insert-ce')!;
+      insertCe.innerHTML = "";
+      bookmarks.forEach(( bookmark ) => {
+        const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
+        const link = document.createElement('a');
+        link.href = bookmark.url;
+        link.textContent = bookmark.title;
+        link.target = '_blank';
+        bookmarkItem.appendChild( link );
+        insertCe.appendChild( bookmarkItem );
+      });
+    }
   }
-};
+}
 
 // App init.
 window.app = CleePIX;

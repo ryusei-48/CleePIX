@@ -25,7 +25,9 @@
     "better-sqlite3-multiple-ciphers": "^8.1.0",
     "bookmark-file-parser": "^1.0.6",
     "cheerio": "^1.0.0-rc.12",
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "file-type": "^18.2.1",
+    "image-type": "^5.2.0"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",

@@ -13,11 +13,14 @@ const selectBookmarksTable = instanceDB.prepare(`SELECT * FROM bookmarks WHERE u
 const insertBookmarkTabale = instanceDB.prepare(`INSERT INTO bookmarks ( title, url, type ) VALUES ( ?, ?, ? )`);
 const selectBookmarkTagsTable = instanceDB.prepare(`SELECT * FROM tags_bookmarks WHERE tags_id = ? AND bookmark_id = ?`);
 const insertBookmarkTagsTable = instanceDB.prepare(`INSERT INTO tags_bookmarks ( tags_id, bookmark_id ) VALUES ( ?, ? )`);
+const searchBelongToTags = instanceDB.prepare(`SELECT * FROM tags_bookmarks WHERE bookmark_id = ?`);
+const searchBelongToTagsStructure = instanceDB.prepare(`SELECT * FROM tags_structure WHERE child_id = ?`);
 port.postMessage(importBookmarks(worker_threads.workerData.bookmarks));
 instanceDB.close();
 port.close();
 function importBookmarks(bookmarks, parentTagId = 0) {
-  let errorLogs = [];
+  const errorLogs = [];
+  const importedBookmarksId = [];
   bookmarks.forEach((item) => {
     try {
       if (item.type === "folder") {
@@ -52,6 +55,7 @@ function importBookmarks(bookmarks, parentTagId = 0) {
             pageType = "youtube";
           }
           const insertedBookmark = insertBookmarkTabale.run(item.name, item.href, pageType);
+          importedBookmarksId.push(insertedBookmark.lastInsertRowid);
           if (insertedBookmark.changes === 1) {
             insertBookmarkTagsTable.run(parentTagId, insertedBookmark.lastInsertRowid);
           }
@@ -62,5 +66,24 @@ function importBookmarks(bookmarks, parentTagId = 0) {
       errorLogs.push(e);
     }
   });
+  try {
+    importedBookmarksId.forEach((bookmarkId) => {
+      const belongToTags = searchBelongToTags.all(bookmarkId);
+      belongToTags.forEach((tag) => {
+        let tmpTagId = tag.tags_id;
+        while (true) {
+          let tmpParentTag = searchBelongToTagsStructure.get(tmpTagId);
+          if (tmpParentTag.parent_id > 0) {
+            insertBookmarkTagsTable.run(tmpParentTag.parent_id, bookmarkId);
+            tmpTagId = tmpParentTag.parent_id;
+          } else
+            return;
+        }
+      });
+    });
+  } catch (e) {
+    console.log(e);
+    errorLogs.push(e);
+  }
   return errorLogs;
 }

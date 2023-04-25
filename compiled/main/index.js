@@ -26,12 +26,8 @@ const Store = require("electron-store");
 const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3-multiple-ciphers");
-const cheerio = require("cheerio");
-const bookmarkFileParser = require("bookmark-file-parser");
-<<<<<<< Updated upstream
-=======
 const node_worker_threads = require("node:worker_threads");
->>>>>>> Stashed changes
+const cheerio = require("cheerio");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -49,13 +45,57 @@ function _interopNamespaceDefault(e) {
   return Object.freeze(n);
 }
 const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
+const scriptRel = "modulepreload";
+const assetsURL = function(dep) {
+  return "/" + dep;
+};
+const seen = {};
+const __vitePreload = function preload(baseModule, deps, importerUrl) {
+  if (true) {
+    return baseModule();
+  }
+  const links = document.getElementsByTagName("link");
+  return Promise.all(deps.map((dep) => {
+    dep = assetsURL(dep);
+    if (dep in seen)
+      return;
+    seen[dep] = true;
+    const isCss = dep.endsWith(".css");
+    const cssSelector = isCss ? '[rel="stylesheet"]' : "";
+    const isBaseRelative = !!importerUrl;
+    if (isBaseRelative) {
+      for (let i = links.length - 1; i >= 0; i--) {
+        const link2 = links[i];
+        if (link2.href === dep && (!isCss || link2.rel === "stylesheet")) {
+          return;
+        }
+      }
+    } else if (document.querySelector(`link[href="${dep}"]${cssSelector}`)) {
+      return;
+    }
+    const link = document.createElement("link");
+    link.rel = isCss ? "stylesheet" : scriptRel;
+    if (!isCss) {
+      link.as = "script";
+      link.crossOrigin = "";
+    }
+    link.href = dep;
+    document.head.appendChild(link);
+    if (isCss) {
+      return new Promise((res, rej) => {
+        link.addEventListener("load", res);
+        link.addEventListener("error", () => rej(new Error(`Unable to preload CSS for ${dep}`)));
+      });
+    }
+  })).then(() => baseModule());
+};
 const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
 function importBookmarksWorker(options) {
   return new node_worker_threads.Worker(require.resolve("./import_bookmarks.js"), options);
 }
 const USER_DATA_PATH = electron.app.getPath("userData");
 const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
-const CleePIXMain = {
+const CleePIX = {
   Windows: {},
   storage: {},
   configTemp: {},
@@ -85,7 +125,7 @@ const CleePIXMain = {
       this.Windows.main = this.createWindowInstance();
       electron.app.on("activate", () => {
         if (electron.BrowserWindow.getAllWindows().length === 0)
-          CleePIXMain.createWindowInstance();
+          CleePIX.createWindowInstance();
       });
     });
     this.config.onDidAnyChange(() => {
@@ -95,13 +135,14 @@ const CleePIXMain = {
       return this.config.store;
     });
     electron.ipcMain.handle("bookmark-file", async (_, dataString) => {
-      const bookmarks = bookmarkFileParser.parseByString(dataString.html);
+      const { parseByString } = await __vitePreload(() => import("bookmark-file-parser"), false ? "__VITE_PRELOAD__" : void 0);
+      const bookmarks = parseByString(dataString.html);
       if (bookmarks.length > 0) {
         return await importBookmarks(getInstanceDatabasePath(dataString.instanceId), bookmarks);
       } else
         return false;
       async function importBookmarks(databasePath, bookmarks2) {
-        return new Promise((resolve2) => {
+        return new Promise(async (resolve2) => {
           if (databasePath) {
             importBookmarksWorker({
               workerData: { dbPath: databasePath, bookmarks: bookmarks2 }
@@ -112,7 +153,7 @@ const CleePIXMain = {
       }
       function getInstanceDatabasePath(instanceId) {
         let databasePath = null;
-        CleePIXMain.config.store.instance.forEach((ite, index) => {
+        CleePIX.config.store.instance.forEach((ite, index) => {
           if (ite.id === instanceId) {
             databasePath = ite.path;
             return;
@@ -125,7 +166,7 @@ const CleePIXMain = {
       if (query.tagIdChain !== null) {
         try {
           const bookmarks = this.storage[query.instanceId].db?.prepare(
-            `SELECT * FROM bookmarks
+            `SELECT bookmarks.* FROM bookmarks
               JOIN tags_bookmarks AS tbt ON bookmarks.id = tbt.bookmark_id
               JOIN tags ON tbt.tags_id = tags.id
               WHERE tags.id IN (${query.tagIdChain.map(() => "?").join(",")})
@@ -307,26 +348,47 @@ const CleePIXMain = {
       }
     });
     electron.ipcMain.handle("get-http-request", async (_, url) => {
-      const response = await fetch(url, {
-        method: "GET",
-        mode: "no-cors",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
+      return await this.shareParts.getWebpageMetadata(url);
+    });
+    electron.ipcMain.handle("set-metadata-all-bookmarks", async (_, instanceId) => {
+      const allBookmarks = this.storage[instanceId].db?.prepare(`SELECT * FROM bookmarks`).all();
+      const updateBookmarks = this.storage[instanceId].db?.prepare(`UPDATE bookmarks SET description = ?, thunb = ? WHERE id = ?`);
+      const { fileTypeFromBuffer } = await __vitePreload(() => import("file-type"), false ? "__VITE_PRELOAD__" : void 0);
+      allBookmarks?.forEach(async (bookmark) => {
+        const metadata = await this.shareParts.getWebpageMetadata(bookmark.url);
+        if (metadata) {
+          const response = await getWebContent(metadata.image);
+          const imageBlob = await response.blob();
+          const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+          const type = await fileTypeFromBuffer(imageBuffer);
+          updateBookmarks?.run(
+            metadata.description,
+            type && type.mime.match(/^image\//) ? imageBuffer : null,
+            bookmark.id
+          );
         }
       });
-      if (response && response.ok) {
-        const $ = cheerio__namespace.load(await response.text());
-        let description = $(`meta[property="og:description"]`).attr("content");
-        if (description === void 0)
-          description = $(`meta[name="description"]`).attr("content");
-        return {
-          title: $("title").text(),
-          description,
-          image: $(`meta[property='og:image']`).attr("content")
-        };
-      } else
-        return null;
+      return true;
     });
+  },
+  shareParts: {
+    getWebpageMetadata: function(url) {
+      return new Promise(async (resolve2) => {
+        const response = await getWebContent(url);
+        if (response && response.ok) {
+          const $ = cheerio__namespace.load(await response.text());
+          let description = $(`meta[property="og:description"]`).attr("content");
+          if (description === void 0)
+            description = $(`meta[name="description"]`).attr("content");
+          resolve2({
+            title: $("title").text(),
+            description: description ? description : "",
+            image: $(`meta[property='og:image']`).attr("content")
+          });
+        } else
+          resolve2(null);
+      });
+    }
   },
   initializeDB: function(storage) {
     this.storage[storage.id] = {};
@@ -341,7 +403,7 @@ const CleePIXMain = {
         `CREATE TABLE "bookmarks" (
           "id" INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
           "title"	TEXT NOT NULL, "description"	TEXT,
-          "data" TEXT, "thunb" TEXT, "memo" TEXT,
+          "data" TEXT, "thunb" BLOB, "memo" TEXT,
           "type" TEXT NOT NULL DEFAULT 'general',
           "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
@@ -466,4 +528,15 @@ function randomString(len = 10) {
   }
   return result;
 }
-CleePIXMain.run();
+async function getWebContent(url) {
+  return new Promise((resolve2) => {
+    fetch(url, {
+      method: "GET",
+      mode: "no-cors",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
+      }
+    }).then(resolve2);
+  });
+}
+CleePIX.run();
