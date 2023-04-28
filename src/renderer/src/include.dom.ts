@@ -106,7 +106,9 @@ export const includeDom: {
               <span>※各ブラウザーからHTML形式のエクスポートファイルを読み込みます。</span>
             </div>
           </fieldset>
+          <span id="test-img"></span>
         </div>
+        <!--<webview id="webview" src="https://www.google.com/" style="display:inline-flex; width:100%; height:100%"></webview>-->
       </div>
   `;
   return dom;

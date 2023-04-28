@@ -1,6 +1,6 @@
-import {app, shell, BrowserWindow, ipcMain, Data} from 'electron';
+import {app, shell, BrowserWindow, BrowserView, ipcMain, Data} from 'electron';
 import Store from 'electron-store';
-import { join, resolve } from 'path'
+import { join, parse, resolve } from 'path'
 import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
@@ -22,20 +22,24 @@ const STORAGE_PATH = USER_DATA_PATH + '/storage/database';
 
 const CleePIX: {
 
-  Windows: {main?: BrowserWindow;},
+  Windows: {
+    main?: BrowserWindow, forScraping: BrowserWindow | null,
+    forScreenshot: BrowserWindow | null
+  },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
   config: Store<storeConfig>, configTemp: storeConfig,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
   createWindowInstance: () => BrowserWindow,
   shareParts: {
     getWebpageMetadata: ( url: string ) => Promise<{
-      title: string, description: string, image: string
-    } | null>
+      title: string, description: string, image: string | null
+    } | null>,
+    getDomScreenshot: ( url: string ) => Promise<Electron.NativeImage | undefined>
   }
 
 } = {
 
-  Windows: {}, storage: {}, configTemp: {},
+  Windows: { forScraping: null, forScreenshot: null }, storage: {}, configTemp: {},
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
   run: function () {
@@ -303,44 +307,94 @@ const CleePIX: {
     });
 
     ipcMain.handle('set-metadata-all-bookmarks', async (_, instanceId) => {
-      const allBookmarks = this.storage[ instanceId ].db?.prepare(`SELECT * FROM bookmarks`).all();
+      const allBookmarks = this.storage[ instanceId ].db?.prepare(`SELECT * FROM bookmarks LIMIT 0, 5`).all();
       const updateBookmarks = this.storage[ instanceId ].db
         ?.prepare(`UPDATE bookmarks SET description = ?, thunb = ? WHERE id = ?`);
       const { fileTypeFromBuffer } = await import('file-type');
-      allBookmarks?.forEach( async ( bookmark ) => {
+      for ( const bookmark of allBookmarks! ) {
         const metadata = await this.shareParts.getWebpageMetadata( bookmark.url );
-        if ( metadata ) {
+        if ( metadata && metadata.image ) {
           const response = await getWebContent( metadata.image );
-          const imageBlob = await response.blob()
-          const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
-          const type = await fileTypeFromBuffer( imageBuffer );
+          const imageBuffer = await response?.arrayBuffer();
+          const type = await fileTypeFromBuffer( imageBuffer! );
           updateBookmarks?.run(
             metadata.description,
-            type && type.mime.match(/^image\//) ? imageBuffer : null, bookmark.id
+            type && type.mime.match(/^image\//) ? Buffer.from( imageBuffer! ) : null, bookmark.id
           );
         }
-      });
+      }
       return true;
+    });
+
+    ipcMain.handle('get-webpage-meta', async (_, url) => {
+      /*const { fileTypeFromBuffer } = await import('file-type');
+      const image = await getWebContent( url );
+      const imageBuffer = await image!.arrayBuffer();
+      const type = await fileTypeFromBuffer( imageBuffer )
+      console.log( type );
+      return { image: Buffer.from( imageBuffer ), mime: type?.mime };*/
+      const allBookmarks = this.storage[ 1 ].db?.prepare(`SELECT * FROM bookmarks LIMIT 0, 5`).all();
+      return allBookmarks;
+    });
+
+    ipcMain.handle('get-dom-screenshot', async (_, url) => {
+      const screenshot = await this.shareParts.getDomScreenshot( url );
+      return screenshot!.toPNG();
     });
   },
 
   shareParts: {
 
-    getWebpageMetadata: function ( url ) {
+    getWebpageMetadata: async function ( url ) {
 
-      return new Promise( async (resolve) => {
+      return new Promise<{
+        title: string, description: string, image: string | null
+      } | null>( async (resolve) => {
 
-        const response = await getWebContent( url );
-        if (response && response.ok) {
-          const $ = cheerio.load(await response.text());
-          let description = $(`meta[property="og:description"]`).attr('content');
-          if (description === undefined) description = $(`meta[name="description"]`).attr('content');
-          resolve({
-            title: $('title').text(), description: description ? description : '',
-            image: $(`meta[property='og:image']`).attr('content')!
+        if ( CleePIX.Windows.forScraping === null ) {
+          CleePIX.Windows.forScraping = new BrowserWindow({
+            width: 1360, height: 830,
+            show: true, frame: true,
+            autoHideMenuBar: true,
+            backgroundColor: "#0f0f0f",
           });
-        } else resolve( null );
+        }
+
+        await CleePIX.Windows.forScraping.loadURL( url );
+
+        CleePIX.Windows.forScraping?.webContents
+          .executeJavaScript(`[document.head.innerHTML, document.body.innerHTML]`, true)
+          .then(( dom ) => {
+            const parser = cheerio.load( `<html><head>${ dom[0] }</head><body>${ dom[1] }</body></html>` )
+            let description = parser(`meta[property="og:description"]`).attr('content');
+            if (description === undefined) description = parser(`meta[name="description"]`).attr('content');
+            const image = parser(`meta[property='og:image']`).attr('content');
+            resolve({
+              title: parser('title').text(), description: description ? description : '',
+              image: image ? image : null
+            });
+          }).catch(() => { resolve( null ) })
       });
+    },
+
+    getDomScreenshot: async function ( url ) {
+
+      if ( CleePIX.Windows.forScraping === null ) {
+        CleePIX.Windows.forScreenshot = new BrowserWindow({
+          width: 1360, height: 830,
+          show: false, frame: true,
+          autoHideMenuBar: true,
+          backgroundColor: "#0f0f0f",
+        });
+      }
+
+      await CleePIX.Windows.forScreenshot?.loadURL( url );
+      const rect = CleePIX.Windows.forScreenshot?.getBounds();
+      rect!.x = 0;
+      rect!.y = 0;
+
+      return await CleePIX.Windows.forScreenshot?.webContents
+        .capturePage( rect, { stayHidden: true } );
     }
   },
 
@@ -495,16 +549,16 @@ function getStrDatetime() {
   return y + '-' + m + '-' + d + ' ' + h + ':' + mi + ':' + s;
 }
 
-async function getWebContent( url: string ): Promise<Response> {
+function getWebContent( url: string ): Promise<Response | null> {
 
   return new Promise((resolve) => {
     fetch( url, {
       method: 'GET',
-      mode: 'no-cors',
+      //mode: 'no-cors',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
       }
-    }).then(resolve);
+    }).then(resolve).catch(() => { resolve( null ) });
   });
 }
 
