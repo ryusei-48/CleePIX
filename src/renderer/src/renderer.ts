@@ -89,18 +89,17 @@ export const CleePIX: {
       if ( e.ctrlKey && e.shiftKey && e.code === 'KeyA' ) {
         window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId);
       }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyS' ) {
-        window.electron.ipcRenderer.invoke('get-webpage-meta', 'https://social-cdn.vivaldi.net/system/site_uploads/files/000/000/004/@1x/902e27b9949777ad.png')
-          .then((res) => {
+        window.electron.ipcRenderer.invoke('get-webpage-image', 'https://social-cdn.vivaldi.net/system/site_uploads/files/000/000/004/@1x/902e27b9949777ad.png')
+          .then((buffer) => {
+            console.log(buffer);
             const insertImage = this.liveDom.addAppSeting
                 .querySelector<HTMLSpanElement>('span#test-img')!;
-            for ( const bookmark of res ) {
-              const img = document.createElement('img');
-              img.style.width = '400px';
-              img.style.aspectRatio = '16 / 9';
-              img.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: 'image/png' }) );
-              insertImage.appendChild( img );
-            }
-          });
+            const img = document.createElement('img');
+            img.style.width = '400px';
+            img.style.aspectRatio = '16 / 9';
+            img.src = window.URL.createObjectURL( new Blob([buffer], { type: 'image/png' }) );
+            insertImage.appendChild( img );
+      });
       }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyD' ) {
         window.electron.ipcRenderer.invoke('get-dom-screenshot', 'https://gigazine.net')
           .then((res) => {
@@ -309,7 +308,7 @@ export const CleePIX: {
       urlInput.addEventListener('change', (e) => {
         const url = (<HTMLInputElement> e.target).value;
         window.electron.ipcRenderer
-          .invoke('get-http-request', url)
+          .invoke('get-site-metadata', url)
           .then(response => {
             if (response !== null) {
               titleInput.value = response.title;
@@ -1101,6 +1100,9 @@ export const CleePIX: {
         link.href = bookmark.url;
         link.textContent = bookmark.title;
         link.target = '_blank';
+        const img = document.createElement('img');
+        img.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: bookmark.thunb_mime }) );
+        bookmarkItem.appendChild( img );
         bookmarkItem.appendChild( link );
         insertCe.appendChild( bookmarkItem );
       });

@@ -27,24 +27,7 @@ const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3-multiple-ciphers");
 const node_worker_threads = require("node:worker_threads");
-const cheerio = require("cheerio");
-function _interopNamespaceDefault(e) {
-  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
-  if (e) {
-    for (const k in e) {
-      if (k !== "default") {
-        const d = Object.getOwnPropertyDescriptor(e, k);
-        Object.defineProperty(n, k, d.get ? d : {
-          enumerable: true,
-          get: () => e[k]
-        });
-      }
-    }
-  }
-  n.default = e;
-  return Object.freeze(n);
-}
-const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
+const axios = require("axios");
 const scriptRel = "modulepreload";
 const assetsURL = function(dep) {
   return "/" + dep;
@@ -138,7 +121,9 @@ const CleePIX = {
       const { parseByString } = await __vitePreload(() => import("bookmark-file-parser"), false ? "__VITE_PRELOAD__" : void 0);
       const bookmarks = parseByString(dataString.html);
       if (bookmarks.length > 0) {
-        return await importBookmarks(getInstanceDatabasePath(dataString.instanceId), bookmarks);
+        const result = await importBookmarks(getInstanceDatabasePath(dataString.instanceId), bookmarks);
+        this.shareParts.setMetadataAllBookmarks(dataString.instanceId);
+        return result;
       } else
         return false;
       async function importBookmarks(databasePath, bookmarks2) {
@@ -166,11 +151,13 @@ const CleePIX = {
       if (query.tagIdChain !== null) {
         try {
           const bookmarks = this.storage[query.instanceId].db?.prepare(
-            `SELECT bookmarks.* FROM bookmarks
-              JOIN tags_bookmarks AS tbt ON bookmarks.id = tbt.bookmark_id
-              JOIN tags ON tbt.tags_id = tags.id
-              WHERE tags.id IN (${query.tagIdChain.map(() => "?").join(",")})
-              GROUP BY bookmarks.id HAVING COUNT( bookmarks.id ) = ?
+            `SELECT bookmarks.id, bookmarks.title, bookmarks.url, bookmarks.description,
+              bookmarks.thunb, bookmarks.thunb_mime, bookmarks.memo, bookmarks.type, 
+              bookmarks.update_time, bookmarks.register_time FROM bookmarks
+              JOIN tags_bookmarks AS tbt ON bookmarks.ROWID = tbt.bookmark_id
+              JOIN tags ON tbt.tags_id = tags.ROWID
+              WHERE tags.ROWID IN (${query.tagIdChain.map(() => "?").join(",")})
+              GROUP BY bookmarks.ROWID HAVING COUNT( bookmarks.ROWID ) = ?
               ORDER BY bookmarks.update_time DESC LIMIT 80`
           ).all(query.tagIdChain, query.tagIdChain.length);
           return bookmarks;
@@ -347,31 +334,15 @@ const CleePIX = {
         return false;
       }
     });
-    electron.ipcMain.handle("get-http-request", async (_, url) => {
+    electron.ipcMain.handle("get-site-metadata", async (_, url) => {
       return await this.shareParts.getWebpageMetadata(url);
     });
     electron.ipcMain.handle("set-metadata-all-bookmarks", async (_, instanceId) => {
-      const allBookmarks = this.storage[instanceId].db?.prepare(`SELECT * FROM bookmarks LIMIT 0, 5`).all();
-      const updateBookmarks = this.storage[instanceId].db?.prepare(`UPDATE bookmarks SET description = ?, thunb = ? WHERE id = ?`);
-      const { fileTypeFromBuffer } = await __vitePreload(() => import("file-type"), false ? "__VITE_PRELOAD__" : void 0);
-      for (const bookmark of allBookmarks) {
-        const metadata = await this.shareParts.getWebpageMetadata(bookmark.url);
-        if (metadata && metadata.image) {
-          const response = await getWebContent(metadata.image);
-          const imageBuffer = await response?.arrayBuffer();
-          const type = await fileTypeFromBuffer(imageBuffer);
-          updateBookmarks?.run(
-            metadata.description,
-            type && type.mime.match(/^image\//) ? Buffer.from(imageBuffer) : null,
-            bookmark.id
-          );
-        }
-      }
-      return true;
+      CleePIX.shareParts.setMetadataAllBookmarks(instanceId);
+      return;
     });
-    electron.ipcMain.handle("get-webpage-meta", async (_, url) => {
-      const allBookmarks = this.storage[1].db?.prepare(`SELECT * FROM bookmarks LIMIT 0, 5`).all();
-      return allBookmarks;
+    electron.ipcMain.handle("get-webpage-image", async (_, url) => {
+      return await getWebImage(url);
     });
     electron.ipcMain.handle("get-dom-screenshot", async (_, url) => {
       const screenshot = await this.shareParts.getDomScreenshot(url);
@@ -385,15 +356,27 @@ const CleePIX = {
           CleePIX.Windows.forScraping = new electron.BrowserWindow({
             width: 1360,
             height: 830,
-            show: true,
+            show: false,
             frame: true,
             autoHideMenuBar: true,
             backgroundColor: "#0f0f0f"
           });
         }
-        await CleePIX.Windows.forScraping.loadURL(url);
-        CleePIX.Windows.forScraping?.webContents.executeJavaScript(`[document.head.innerHTML, document.body.innerHTML]`, true).then((dom) => {
-          const parser = cheerio__namespace.load(`<html><head>${dom[0]}</head><body>${dom[1]}</body></html>`);
+        CleePIX.Windows.forScraping.webContents.audioMuted = true;
+        try {
+          if (url.match(/^(https|http):\/\/.*/)) {
+            await CleePIX.Windows.forScraping.loadURL(url).catch(() => {
+              return;
+            });
+          } else
+            resolve2(null);
+        } catch (e) {
+          console.log(e);
+          resolve2(null);
+        }
+        CleePIX.Windows.forScraping?.webContents.executeJavaScript(`[document.head.innerHTML, document.body.innerHTML]`, true).then(async (dom) => {
+          const cheerio = await __vitePreload(() => import("cheerio"), false ? "__VITE_PRELOAD__" : void 0);
+          const parser = cheerio.load(`<html><head>${dom[0]}</head><body>${dom[1]}</body></html>`);
           let description = parser(`meta[property="og:description"]`).attr("content");
           if (description === void 0)
             description = parser(`meta[name="description"]`).attr("content");
@@ -409,7 +392,7 @@ const CleePIX = {
       });
     },
     getDomScreenshot: async function(url) {
-      if (CleePIX.Windows.forScraping === null) {
+      if (CleePIX.Windows.forScreenshot === null) {
         CleePIX.Windows.forScreenshot = new electron.BrowserWindow({
           width: 1360,
           height: 830,
@@ -419,11 +402,59 @@ const CleePIX = {
           backgroundColor: "#0f0f0f"
         });
       }
-      await CleePIX.Windows.forScreenshot?.loadURL(url);
+      CleePIX.Windows.forScreenshot.webContents.audioMuted = true;
+      try {
+        if (url.match(/^(https|http):\/\/.*/)) {
+          await CleePIX.Windows.forScreenshot?.loadURL(url).catch(() => {
+            return;
+          });
+        } else
+          return void 0;
+      } catch (e) {
+        console.log(e);
+        return void 0;
+      }
       const rect = CleePIX.Windows.forScreenshot?.getBounds();
       rect.x = 0;
       rect.y = 0;
       return await CleePIX.Windows.forScreenshot?.webContents.capturePage(rect, { stayHidden: true });
+    },
+    setMetadataAllBookmarks: async function(instanceId) {
+      try {
+        const allBookmarks = CleePIX.storage[instanceId].db?.prepare(`SELECT * FROM bookmarks`).all();
+        const updateBookmarks = CleePIX.storage[instanceId].db?.prepare(`UPDATE bookmarks SET description = ?, thunb = ?, thunb_mime = ? WHERE id = ?`);
+        const { fileTypeFromBuffer } = await __vitePreload(() => import("file-type"), false ? "__VITE_PRELOAD__" : void 0);
+        let count = 0;
+        for (const bookmark of allBookmarks) {
+          console.log(bookmark.url);
+          count++;
+          console.log(count);
+          const metadata = await this.getWebpageMetadata(bookmark.url);
+          if (metadata && metadata.image) {
+            const imageBuffer = await getWebImage(metadata.image);
+            let type = void 0;
+            if (imageBuffer) {
+              type = await fileTypeFromBuffer(imageBuffer);
+            }
+            updateBookmarks?.run(
+              metadata.description,
+              type && type.mime.match(/^image\//) ? imageBuffer : null,
+              type && type.mime.match(/^image\//) ? type.mime : null,
+              bookmark.id
+            );
+          } else if (metadata && metadata.image === null) {
+            const image = await this.getDomScreenshot(bookmark.url);
+            updateBookmarks?.run(
+              metadata.description,
+              image ? image.toPNG() : null,
+              "image/png",
+              bookmark.id
+            );
+          }
+        }
+      } catch (e) {
+        console.log(e);
+      }
     }
   },
   initializeDB: function(storage) {
@@ -435,11 +466,12 @@ const CleePIX = {
     }
     const initDB = () => {
       this.storage[storage.id].db = new Database(storage.path);
+      this.storage[storage.id].db?.pragma("journal_mode = WAL");
       this.storage[storage.id].db.prepare(
         `CREATE TABLE "bookmarks" (
           "id" INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
           "title"	TEXT NOT NULL, "description"	TEXT,
-          "data" TEXT, "thunb" BLOB, "memo" TEXT,
+          "data" TEXT, "thunb" BLOB, "thunb_mime" TEXT, "memo" TEXT,
           "type" TEXT NOT NULL DEFAULT 'general',
           "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
           "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
@@ -471,6 +503,10 @@ const CleePIX = {
           PRIMARY KEY("parent_id", "child_id")
         )`
       ).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX bk1 ON bookmarks( id, url, update_time, register_time )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX tg1 ON tags( id, name, update_time, register_time )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX tb1 ON tags_bookmarks( tags_id, bookmark_id )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX ts1 ON tags_structure( parent_id, child_id )`).run();
       [
         "プログラミング",
         "プログラミング言語",
@@ -564,15 +600,18 @@ function randomString(len = 10) {
   }
   return result;
 }
-function getWebContent(url) {
+async function getWebImage(url) {
   return new Promise((resolve2) => {
-    fetch(url, {
-      method: "GET",
-      //mode: 'no-cors',
+    axios.get(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
-      }
-    }).then(resolve2).catch(() => {
+      },
+      responseType: "arraybuffer",
+      timeout: 6e3
+    }).then(async (response) => {
+      resolve2(Buffer.from(response.data));
+    }).catch((err) => {
+      console.log(err);
       resolve2(null);
     });
   });
