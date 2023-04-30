@@ -39,6 +39,11 @@ export const includeDom: {
       <div class="tmp-doms">
         <div hidden id="show-tag-context-menu-wrap"></div>
         <div hidden id="show-tag-context-menu"></div>
+        <div inert id="show-loading-efect">
+          <div class="spinner">
+            <div></div> <div></div><div></div><div></div>    
+          </div>
+        </div>
       </div>
       `;
     return dom;

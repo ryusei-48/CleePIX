@@ -76,6 +76,9 @@ const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
 function importBookmarksWorker(options) {
   return new node_worker_threads.Worker(require.resolve("./import_bookmarks.js"), options);
 }
+function getBookmarksWorker(options) {
+  return new node_worker_threads.Worker(require.resolve("./chunks/get-bookmarks-fb5e491d.js"), options);
+}
 const USER_DATA_PATH = electron.app.getPath("userData");
 const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
 const CleePIX = {
@@ -117,11 +120,12 @@ const CleePIX = {
     electron.ipcMain.handle("get-config", () => {
       return this.config.store;
     });
-    electron.ipcMain.handle("bookmark-file", async (_, dataString) => {
+    electron.ipcMain.handle("import-bookmark-file", async (_, dataString) => {
       const { parseByString } = await __vitePreload(() => import("bookmark-file-parser"), false ? "__VITE_PRELOAD__" : void 0);
       const bookmarks = parseByString(dataString.html);
       if (bookmarks.length > 0) {
-        const result = await importBookmarks(getInstanceDatabasePath(dataString.instanceId), bookmarks);
+        const dbPath = this.shareParts.getInstanceDatabasePath(dataString.instanceId);
+        const result = await importBookmarks(dbPath, bookmarks);
         this.shareParts.setMetadataAllBookmarks(dataString.instanceId);
         return result;
       } else
@@ -136,39 +140,22 @@ const CleePIX = {
             resolve2(false);
         });
       }
-      function getInstanceDatabasePath(instanceId) {
-        let databasePath = null;
-        CleePIX.config.store.instance.forEach((ite, index) => {
-          if (ite.id === instanceId) {
-            databasePath = ite.path;
-            return;
-          }
-        });
-        return databasePath;
-      }
     });
-    electron.ipcMain.handle("get-bookmarks", (_, query) => {
+    electron.ipcMain.handle("get-bookmarks", async (_, query) => {
       if (query.tagIdChain !== null) {
-        try {
-          const bookmarks = this.storage[query.instanceId].db?.prepare(
-            `SELECT bookmarks.id, bookmarks.title, bookmarks.url, bookmarks.description,
-              bookmarks.thunb, bookmarks.thunb_mime, bookmarks.memo, bookmarks.type, 
-              bookmarks.update_time, bookmarks.register_time FROM bookmarks
-              JOIN tags_bookmarks AS tbt ON bookmarks.ROWID = tbt.bookmark_id
-              JOIN tags ON tbt.tags_id = tags.ROWID
-              WHERE tags.ROWID IN (${query.tagIdChain.map(() => "?").join(",")})
-              GROUP BY bookmarks.ROWID HAVING COUNT( bookmarks.ROWID ) = ?
-              ORDER BY bookmarks.update_time DESC LIMIT 80`
-          ).all(query.tagIdChain, query.tagIdChain.length);
-          return bookmarks;
-        } catch (e) {
-          console.log(e);
-          return null;
-        }
+        const dbPath = this.shareParts.getInstanceDatabasePath(query.instanceId);
+        return await getBookmarks(dbPath, query.tagIdChain);
       } else {
         return this.storage[query.instanceId].db?.prepare(
           `SELECT * FROM bookmarks ORDER BY update_time DESC LIMIT 80`
         ).all();
+      }
+      async function getBookmarks(dbPath, tagIdChain) {
+        return new Promise((resolve2) => {
+          getBookmarksWorker({
+            workerData: { dbPath, tagIdChain }
+          }).on("message", resolve2);
+        });
       }
     });
     electron.ipcMain.on("window-close", () => {
@@ -338,8 +325,8 @@ const CleePIX = {
       return await this.shareParts.getWebpageMetadata(url);
     });
     electron.ipcMain.handle("set-metadata-all-bookmarks", async (_, instanceId) => {
-      CleePIX.shareParts.setMetadataAllBookmarks(instanceId);
-      return;
+      this.shareParts.setMetadataAllBookmarks(instanceId);
+      return true;
     });
     electron.ipcMain.handle("get-webpage-image", async (_, url) => {
       return await getWebImage(url);
@@ -350,6 +337,16 @@ const CleePIX = {
     });
   },
   shareParts: {
+    getInstanceDatabasePath: function(instanceId) {
+      let databasePath = null;
+      CleePIX.config.store.instance.forEach((ite, index) => {
+        if (ite.id === instanceId) {
+          databasePath = ite.path;
+          return;
+        }
+      });
+      return databasePath;
+    },
     getWebpageMetadata: async function(url) {
       return new Promise(async (resolve2) => {
         if (CleePIX.Windows.forScraping === null) {
@@ -421,7 +418,7 @@ const CleePIX = {
     },
     setMetadataAllBookmarks: async function(instanceId) {
       try {
-        const allBookmarks = CleePIX.storage[instanceId].db?.prepare(`SELECT * FROM bookmarks`).all();
+        const allBookmarks = CleePIX.storage[instanceId].db?.prepare(`SELECT * FROM bookmarks WHERE thunb IS NULL`).all();
         const updateBookmarks = CleePIX.storage[instanceId].db?.prepare(`UPDATE bookmarks SET description = ?, thunb = ?, thunb_mime = ? WHERE id = ?`);
         const { fileTypeFromBuffer } = await __vitePreload(() => import("file-type"), false ? "__VITE_PRELOAD__" : void 0);
         let count = 0;
@@ -432,25 +429,28 @@ const CleePIX = {
           const metadata = await this.getWebpageMetadata(bookmark.url);
           if (metadata && metadata.image) {
             const imageBuffer = await getWebImage(metadata.image);
-            let type = void 0;
             if (imageBuffer) {
-              type = await fileTypeFromBuffer(imageBuffer);
-            }
-            updateBookmarks?.run(
-              metadata.description,
-              type && type.mime.match(/^image\//) ? imageBuffer : null,
-              type && type.mime.match(/^image\//) ? type.mime : null,
-              bookmark.id
-            );
+              const type = await fileTypeFromBuffer(imageBuffer);
+              updateBookmarks?.run(
+                metadata.description,
+                type && type.mime.match(/^image\//) ? imageBuffer : null,
+                type && type.mime.match(/^image\//) ? type.mime : null,
+                bookmark.id
+              );
+            } else
+              useScreenshot(metadata, bookmark);
           } else if (metadata && metadata.image === null) {
-            const image = await this.getDomScreenshot(bookmark.url);
-            updateBookmarks?.run(
-              metadata.description,
-              image ? image.toPNG() : null,
-              "image/png",
-              bookmark.id
-            );
+            useScreenshot(metadata, bookmark);
           }
+        }
+        async function useScreenshot(metadata, bookmark) {
+          const image = await CleePIX.shareParts.getDomScreenshot(bookmark.url);
+          updateBookmarks?.run(
+            metadata.description,
+            image ? image.toPNG() : null,
+            "image/png",
+            bookmark.id
+          );
         }
       } catch (e) {
         console.log(e);
@@ -503,10 +503,10 @@ const CleePIX = {
           PRIMARY KEY("parent_id", "child_id")
         )`
       ).run();
-      this.storage[storage.id].db?.prepare(`CREATE INDEX bk1 ON bookmarks( id, url, update_time, register_time )`).run();
-      this.storage[storage.id].db?.prepare(`CREATE INDEX tg1 ON tags( id, name, update_time, register_time )`).run();
-      this.storage[storage.id].db?.prepare(`CREATE INDEX tb1 ON tags_bookmarks( tags_id, bookmark_id )`).run();
-      this.storage[storage.id].db?.prepare(`CREATE INDEX ts1 ON tags_structure( parent_id, child_id )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX bookmarks_index ON bookmarks( id, url, update_time, register_time )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX tags_index ON tags( id, name, update_time, register_time )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX tb_index ON tags_bookmarks( tags_id, bookmark_id )`).run();
+      this.storage[storage.id].db?.prepare(`CREATE INDEX ts_index ON tags_structure( parent_id, child_id )`).run();
       [
         "プログラミング",
         "プログラミング言語",

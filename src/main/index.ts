@@ -6,6 +6,7 @@ import fs from "fs";
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
 import importBookmarksWorker from "./thread-scripts/import-bookmarks?nodeWorker";
+import getBookmarksWorker from './thread-scripts/get-bookmarks?nodeWorker';
 import axios from "axios";
 import { IBaseMark } from "bookmark-file-parser";
 
@@ -31,6 +32,7 @@ const CleePIX: {
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
   createWindowInstance: () => BrowserWindow,
   shareParts: {
+    getInstanceDatabasePath: ( instanceId: number ) => string | null,
     getWebpageMetadata: ( url: string ) => Promise<{
       title: string, description: string, image: string | null
     } | null>,
@@ -84,11 +86,12 @@ const CleePIX: {
       return this.config.store;
     });
 
-    ipcMain.handle('bookmark-file', async (_, dataString) => {
+    ipcMain.handle('import-bookmark-file', async (_, dataString) => {
       const { parseByString } = await import('bookmark-file-parser');
       const bookmarks = parseByString(dataString.html);
       if (bookmarks.length > 0) {
-        const result = await importBookmarks( getInstanceDatabasePath( dataString.instanceId ), bookmarks );
+        const dbPath = this.shareParts.getInstanceDatabasePath( dataString.instanceId );
+        const result = await importBookmarks( dbPath, bookmarks );
         this.shareParts.setMetadataAllBookmarks( dataString.instanceId );
         return result;
       }else return false;
@@ -102,37 +105,25 @@ const CleePIX: {
           }else resolve( false );
         });
       }
-
-      function getInstanceDatabasePath( instanceId: number ): string | null {
-        let databasePath: string | null = null;
-        CleePIX.config.store.instance!.forEach((ite, index) => {
-          if ( ite.id === instanceId ) {
-            databasePath = ite.path; return;
-          }
-        });
-        return databasePath;
-      }
     });
 
-    ipcMain.handle('get-bookmarks', (_, query) => {
+    ipcMain.handle('get-bookmarks', async (_, query) => {
       if ( query.tagIdChain !== null  ) {
-        try {
-          const bookmarks = this.storage[ query.instanceId ].db?.prepare(
-            `SELECT bookmarks.id, bookmarks.title, bookmarks.url, bookmarks.description,
-              bookmarks.thunb, bookmarks.thunb_mime, bookmarks.memo, bookmarks.type, 
-              bookmarks.update_time, bookmarks.register_time FROM bookmarks
-              JOIN tags_bookmarks AS tbt ON bookmarks.ROWID = tbt.bookmark_id
-              JOIN tags ON tbt.tags_id = tags.ROWID
-              WHERE tags.ROWID IN (${ query.tagIdChain.map(() => '?').join(',') })
-              GROUP BY bookmarks.ROWID HAVING COUNT( bookmarks.ROWID ) = ?
-              ORDER BY bookmarks.update_time DESC LIMIT 80`
-          ).all( query.tagIdChain, query.tagIdChain.length );
-          return bookmarks;
-        }catch (e) { console.log(e); return null; }
+        const dbPath = this.shareParts.getInstanceDatabasePath( query.instanceId );
+        return await getBookmarks( dbPath, query.tagIdChain );
       }else {
         return this.storage[ query.instanceId ].db?.prepare(
           `SELECT * FROM bookmarks ORDER BY update_time DESC LIMIT 80`
         ).all();
+      }
+
+      async function getBookmarks( dbPath: string | null, tagIdChain: number[] ) {
+
+        return new Promise<any[] | null>((resolve) => {
+          getBookmarksWorker({
+            workerData: { dbPath, tagIdChain }
+          }).on('message', resolve);
+        });
       }
     });
 
@@ -312,7 +303,7 @@ const CleePIX: {
     });
 
     ipcMain.handle('set-metadata-all-bookmarks', async (_, instanceId) => {
-      CleePIX.shareParts.setMetadataAllBookmarks( instanceId ); return;
+      this.shareParts.setMetadataAllBookmarks( instanceId ); return true;
     });
 
     ipcMain.handle('get-webpage-image', async (_, url) => {
@@ -326,6 +317,17 @@ const CleePIX: {
   },
 
   shareParts: {
+
+    getInstanceDatabasePath: function ( instanceId ) {
+
+      let databasePath: string | null = null;
+      CleePIX.config.store.instance!.forEach((ite, index) => {
+        if ( ite.id === instanceId ) {
+          databasePath = ite.path; return;
+        }
+      });
+      return databasePath;
+    },
 
     getWebpageMetadata: async function ( url ) {
 
@@ -398,7 +400,7 @@ const CleePIX: {
     setMetadataAllBookmarks: async function ( instanceId ) {
 
       try {
-        const allBookmarks = CleePIX.storage[ instanceId ].db?.prepare(`SELECT * FROM bookmarks`).all();
+        const allBookmarks = CleePIX.storage[ instanceId ].db?.prepare(`SELECT * FROM bookmarks WHERE thunb IS NULL`).all();
         const updateBookmarks = CleePIX.storage[ instanceId ].db
           ?.prepare(`UPDATE bookmarks SET description = ?, thunb = ?, thunb_mime = ? WHERE id = ?`);
         const { fileTypeFromBuffer } = await import('file-type');
@@ -410,21 +412,24 @@ const CleePIX: {
           const metadata = await this.getWebpageMetadata( bookmark.url );
           if ( metadata && metadata.image ) {
             const imageBuffer = await getWebImage( metadata.image );
-            let type: any = undefined;
             if ( imageBuffer ) {
-              type = await fileTypeFromBuffer( imageBuffer! );
-            }
-            updateBookmarks?.run(
-              metadata.description, 
-              type && type.mime.match(/^image\//) ? imageBuffer! : null,
-              type && type.mime.match(/^image\//) ? type.mime : null, bookmark.id
-            );
+              const type = await fileTypeFromBuffer( imageBuffer! );
+              updateBookmarks?.run(
+                metadata.description, 
+                type && type.mime.match(/^image\//) ? imageBuffer! : null,
+                type && type.mime.match(/^image\//) ? type.mime : null, bookmark.id
+              );
+            }else useScreenshot( metadata, bookmark );
           }else if ( metadata && metadata.image === null ) {
-            const image = await this.getDomScreenshot( bookmark.url );
-            updateBookmarks?.run(
-              metadata.description, image ? image.toPNG() : null, 'image/png', bookmark.id
-            );
+            useScreenshot( metadata, bookmark );
           }
+        }
+
+        async function useScreenshot( metadata, bookmark ): Promise<void> {
+          const image = await CleePIX.shareParts.getDomScreenshot( bookmark.url );
+          updateBookmarks?.run(
+            metadata.description, image ? image.toPNG() : null, 'image/png', bookmark.id
+          );
         }
       }catch (e) { console.log(e) }
     }
@@ -481,14 +486,16 @@ const CleePIX: {
         )`
       ).run();
 
+      this.storage[storage.id].db?.prepare(
+        `CREATE INDEX bookmarks_index
+          ON bookmarks( id, title, description, url, data, memo, update_time, register_time )`
+        ).run();
       this.storage[storage.id].db
-        ?.prepare(`CREATE INDEX bk1 ON bookmarks( id, url, update_time, register_time )`).run();
+        ?.prepare(`CREATE INDEX tags_index ON tags( id, name, update_time, register_time )`).run();
       this.storage[storage.id].db
-        ?.prepare(`CREATE INDEX tg1 ON tags( id, name, update_time, register_time )`).run();
+        ?.prepare(`CREATE INDEX tb_index ON tags_bookmarks( tags_id, bookmark_id )`).run();
       this.storage[storage.id].db
-        ?.prepare(`CREATE INDEX tb1 ON tags_bookmarks( tags_id, bookmark_id )`).run();
-      this.storage[storage.id].db
-        ?.prepare(`CREATE INDEX ts1 ON tags_structure( parent_id, child_id )`).run();
+        ?.prepare(`CREATE INDEX ts_index ON tags_structure( parent_id, child_id )`).run();
 
       [
         'プログラミング', 'プログラミング言語', 'プロミス', 'プロパンガス',
@@ -589,19 +596,6 @@ function getStrDatetime() {
   const s = ('0' + date.getSeconds()).slice(-2);
 
   return y + '-' + m + '-' + d + ' ' + h + ':' + mi + ':' + s;
-}
-
-function getWebContent( url: string ): Promise<Response | null> {
-
-  return new Promise((resolve) => {
-    fetch( url, {
-      method: 'GET',
-      //mode: 'no-cors',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
-      }
-    }).then(resolve).catch(() => { resolve( null ) });
-  });
 }
 
 async function getWebImage( url: string ): Promise<Buffer | null> {

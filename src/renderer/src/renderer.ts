@@ -41,7 +41,10 @@ export const CleePIX: {
     tagTreePanel: {[key: number]: HTMLUListElement},
     contentsPanel: {[key: string]: HTMLDivElement}
   },
-  shareParts: { getBookmarkItemDom: ( bookmarks: any ) => void }
+  shareParts: {
+    getBookmarkItemDom: ( bookmarks: any ) => void,
+    toggleLoadingEfect: ( toggle: boolean ) => void
+  }
 
 } = {
 
@@ -87,7 +90,8 @@ export const CleePIX: {
 
     window.addEventListener('keydown', (e) => {
       if ( e.ctrlKey && e.shiftKey && e.code === 'KeyA' ) {
-        window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId);
+        window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId)
+          .then((result) => { console.log(result) });
       }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyS' ) {
         window.electron.ipcRenderer.invoke('get-webpage-image', 'https://social-cdn.vivaldi.net/system/site_uploads/files/000/000/004/@1x/902e27b9949777ad.png')
           .then((buffer) => {
@@ -163,9 +167,11 @@ export const CleePIX: {
               alert('ファイルの読み込みに失敗しました。');
             };
             reader.onload = () => {
-              window.electron.ipcRenderer.invoke('bookmark-file', {
+              CleePIX.shareParts.toggleLoadingEfect( true );
+              window.electron.ipcRenderer.invoke('import-bookmark-file', {
                 instanceId: CleePIX.currentInstanceId, html: reader.result
               }).then( async (res) => {
+                CleePIX.shareParts.toggleLoadingEfect( false );
                 if ( Array.isArray( res ) ) {
                   await window.electron.ipcRenderer.invoke('set-tag-tree-cache', null);
                   window.location.reload();
@@ -563,6 +569,7 @@ export const CleePIX: {
 
           button.addEventListener('click', () => {
 
+            CleePIX.shareParts.toggleLoadingEfect( true );
             if (currentTagNameWrap !== null) {
               currentTagNameWrap.style.removeProperty('background-color');
             }
@@ -1079,6 +1086,7 @@ export const CleePIX: {
 
     addContents: function () {
 
+      CleePIX.shareParts.toggleLoadingEfect( true );
       window.electron.ipcRenderer
         .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain: null })
         .then( CleePIX.shareParts.getBookmarkItemDom );
@@ -1106,6 +1114,24 @@ export const CleePIX: {
         bookmarkItem.appendChild( link );
         insertCe.appendChild( bookmarkItem );
       });
+
+      CleePIX.shareParts.toggleLoadingEfect( false );
+    },
+
+    toggleLoadingEfect: function ( toggle ) {
+
+      const main = CleePIX.liveDom.base.querySelector('main');
+      const showLoadingEfect = CleePIX.liveDom.base.querySelector<HTMLDivElement>('#show-loading-efect');
+
+      if ( toggle === true ) {
+        main!.inert = true;
+        showLoadingEfect!.inert = false;
+        showLoadingEfect!.classList.add('show');
+      }else {
+        main!.inert = false;
+        showLoadingEfect!.inert = true;
+        showLoadingEfect!.classList.remove('show');
+      }
     }
   }
 }
