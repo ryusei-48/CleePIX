@@ -25,7 +25,10 @@ body {
   font-weight: 1;
   line-height: 1.6;
   background-attachment: fixed;
-  background: transparent;
+  background-size: cover;
+  //background-color: rgba(49, 49, 49, 0.7);
+  //background-image: linear-gradient(112.1deg, rgb(32, 38, 57) 11.4%, rgb(63, 76, 119) 70.2%);
+  background-image: url(../img/windows_11/win10.jpg);
   overflow: hidden;
   height: 100vh;
 }
@@ -150,6 +153,16 @@ $sp: 480px; // スマホ
   }
 }
 
+@mixin background {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px) contrast(140%) brightness(90%);
+}
+
+@mixin background-modal {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px) contrast(140%) brightness(90%);
+}
+
 // #####################
 // ウィンドウタイトルバー
 // #####################
@@ -157,7 +170,7 @@ header {
   display: block;
   width: 100vw;
   height: 25.6px;
-  background-color: rgb(75, 75, 75);
+  background-color: rgb(21, 72, 88);
   -webkit-app-region: drag;
   @include flexbese;
   .app-name {
@@ -208,7 +221,7 @@ main {
   position: relative;
   width: 100vw;
   height: calc(100vh - 25.6px);
-  background-color: $bg-color;
+  @include background();
   .instance-panel {
     @include flexbese($jc: left);
     height: 100%;
@@ -502,7 +515,8 @@ main {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 109, 4, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px) contrast(140%) brightness(90%);
   z-index: 1;
   opacity: 0;
   transition: all 0.5s;
@@ -513,7 +527,6 @@ main {
   position: absolute;
   max-height: calc(100vh - 150px);
   z-index: 2;
-  background-color: $bg-color;
   padding: 25px;
   text-align: center;
   opacity: 0;
@@ -581,6 +594,7 @@ main {
   width: 100%;
   max-height: unset;
   height: 100%;
+  @include background-modal();
   //max-height: 80%;
   //max-width: 700px;
   //transform-origin: top;
@@ -596,6 +610,7 @@ main {
   bottom: 0;
   left: 0;
   width: 100%;
+  background-color: $bg-color;
   transform: translateY(100%);
   .instance-names {
     display: inline-block;
@@ -632,6 +647,7 @@ main {
   width: 60%;
   max-width: 760px;
   text-align: center;
+  background: $bg-color;
   transform-origin: top;
   transform: translate(-50%, -50%);
   h2 {
@@ -645,6 +661,7 @@ main {
   left: 50%;
   width: 60%;
   max-width: 760px;
+  background: $bg-color;
   transform-origin: top;
   transform: translate(-50%, -50%);
 }
@@ -654,6 +671,7 @@ main {
   top: 25%;
   left: 50%;
   width: 75%;
+  background: $bg-color;
   transform-origin: top;
   transform: translate(-50%, -50%);
   div#show-add-text-field {

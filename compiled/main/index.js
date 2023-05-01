@@ -503,7 +503,10 @@ const CleePIX = {
           PRIMARY KEY("parent_id", "child_id")
         )`
       ).run();
-      this.storage[storage.id].db?.prepare(`CREATE INDEX bookmarks_index ON bookmarks( id, url, update_time, register_time )`).run();
+      this.storage[storage.id].db?.prepare(
+        `CREATE INDEX bookmarks_index
+          ON bookmarks( id, title, description, url, data, memo, update_time, register_time )`
+      ).run();
       this.storage[storage.id].db?.prepare(`CREATE INDEX tags_index ON tags( id, name, update_time, register_time )`).run();
       this.storage[storage.id].db?.prepare(`CREATE INDEX tb_index ON tags_bookmarks( tags_id, bookmark_id )`).run();
       this.storage[storage.id].db?.prepare(`CREATE INDEX ts_index ON tags_structure( parent_id, child_id )`).run();
@@ -568,7 +571,7 @@ const CleePIX = {
       show: false,
       frame: false,
       autoHideMenuBar: true,
-      backgroundColor: "#0f0f0f",
+      backgroundColor: "#00000008",
       ...process.platform === "linux" ? { icon } : {},
       webPreferences: {
         preload: path.join(__dirname, "../preload/index.js"),

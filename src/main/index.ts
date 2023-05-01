@@ -542,7 +542,7 @@ const CleePIX: {
       height: 830,
       show: false, frame: false,
       autoHideMenuBar: true,
-      backgroundColor: "#0f0f0f",
+      backgroundColor: "#00000008",
       ...(process.platform === 'linux' ? { icon } : {}),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),

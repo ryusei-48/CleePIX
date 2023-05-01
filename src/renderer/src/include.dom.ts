@@ -114,6 +114,7 @@ export const includeDom: {
           <span id="test-img"></span>
         </div>
         <!--<webview id="webview" src="https://www.google.com/" style="display:inline-flex; width:100%; height:100%"></webview>-->
+        <iframe style="width:700px;aspect-ratio:16 / 9;" src="https://www.youtube.com/embed/py7U28qEbPU" title="夢花火 / 百鬼あやめ original" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
       </div>
   `;
   return dom;
