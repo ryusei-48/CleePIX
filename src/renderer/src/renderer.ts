@@ -19,7 +19,10 @@ export const CleePIX: {
   init: () => void, currentInstanceId: number,
   config: {
     instance?: {label: string, id: number, path: string;}[],
-    cache?: {currentInstanceId: number, tagTreeDomStrings: {[key: number]: string;} | null;};
+    cache?: {
+      currentInstanceId: number, selectedTags: { [key: number]: number } | null,
+      tagTreeDomStrings: {[key: number]: string;} | null;
+    }
   },
   instanceDBs: {label: string, id: number, path: string;}[],
   instanceLabels: string[], windowControl: () => void,
@@ -513,7 +516,7 @@ export const CleePIX: {
 
     tagTreePanel: async function () {
 
-      let currentTagNameWrap: HTMLSpanElement | null = null;
+      let currentTagNameWrap: { [key: number]: HTMLSpanElement } | null = null;
       const setTagEvent: (
         target: {
           expansionButtonList: HTMLButtonElement[],
@@ -570,12 +573,14 @@ export const CleePIX: {
           button.addEventListener('click', () => {
 
             CleePIX.shareParts.toggleLoadingEfect( true );
-            if (currentTagNameWrap !== null) {
-              currentTagNameWrap.style.removeProperty('background-color');
+            if (currentTagNameWrap && currentTagNameWrap[ CleePIX.currentInstanceId ]) {
+              currentTagNameWrap[ CleePIX.currentInstanceId ].style.removeProperty('background-color');
+            }else if ( currentTagNameWrap === null ) {
+              currentTagNameWrap = {}
             }
             const buttonWrap = <HTMLSpanElement> button.parentNode;
             buttonWrap.style.backgroundColor = '#414141';
-            currentTagNameWrap = buttonWrap;
+            currentTagNameWrap[ CleePIX.currentInstanceId ] = buttonWrap;
 
             let tagIdChain: number[] = [];
             let parentTagId: number = 1;
@@ -824,7 +829,7 @@ export const CleePIX: {
 
               expansionButton.dataset.loaded = target === null ? 'true' : 'false';
 
-              insertAttrTreeItem(isRoot, parentId, li, tagNameButton, target!);
+              insertAttrTreeItem(isRoot, parentId, li, tagNameButton);
 
               expansionButtonList.push(expansionButton);
               tagNameButtonList.push(tagNameButton);
@@ -880,16 +885,12 @@ export const CleePIX: {
 
       function insertAttrTreeItem(
         isRoot: boolean, parentTagId: number, targetLi: HTMLLIElement,
-        targetTagNameButton: HTMLButtonElement, readLi: HTMLLIElement
+        targetTagNameButton: HTMLButtonElement
       ) {
         if (isRoot === false) {
-          /*const clickTagNameButton = readLi.querySelector<HTMLButtonElement>('button.tag-name')!;
-          targetTagNameButton.dataset.tagChain =
-            (clickTagNameButton.dataset.tagChain + ',' + parentTagId + ',').replace(/^,|,$/g, '');*/
           targetTagNameButton.dataset.parentTagId = `${parentTagId}`;
           targetLi.dataset.parentTagId = `${parentTagId}`;
         } else {
-          //targetTagNameButton.dataset.tagChain = '';
           targetTagNameButton.dataset.parentTagId = '0';
           targetLi.dataset.parentTagId = '0';
         }
@@ -948,8 +949,7 @@ export const CleePIX: {
                       tagNameButtonList: [tagNameButton],
                       tagMenuButtonList: [tagMenuButton]
                     });
-                    const readLi = <HTMLLIElement> targetUl?.parentElement!;
-                    insertAttrTreeItem(isRoot, tagId!, insertLi, tagNameButton, readLi);
+                    insertAttrTreeItem(isRoot, tagId!, insertLi, tagNameButton);
                     targetUl?.insertAdjacentElement('beforeend', insertLi);
                     if (targetUl!.childElementCount <= 3) {
                       targetUl!.querySelector('li > button[data-tag-id="none"]')
@@ -1014,7 +1014,15 @@ export const CleePIX: {
         for (const [key, ul] of Object.entries(CleePIX.liveDom.tagTreePanel)) {
           tagTreeCache[key] = ul.outerHTML;
         }
-        window.electron.ipcRenderer.invoke('set-tag-tree-cache', tagTreeCache);
+        let selectedTags: {[key: number]: number} | null = null;
+        if ( currentTagNameWrap ) {
+          for ( const [instanceId, span] of Object.entries(currentTagNameWrap) ) {
+            if ( selectedTags === null ) selectedTags = {};
+            const button = span.querySelector<HTMLButtonElement>('button.tag-name')!;
+            selectedTags[ instanceId ] = Number( button.dataset.tagId );
+          }
+        }
+        window.electron.ipcRenderer.send('set-tag-tree-cache', { tagTreeCache, selectedTags });
       }
 
       CleePIX.liveDom.instancePanel
@@ -1041,6 +1049,18 @@ export const CleePIX: {
 
           [...tagTree.querySelectorAll<HTMLLIElement>(`li[role='treeitem']`)].forEach((li) => {setDragEventLi(li);});
         }
+
+        if ( CleePIX.config.cache && CleePIX.config.cache.selectedTags ) {
+          Object.entries( CleePIX.config.cache.selectedTags ).forEach((selectedTag) => {
+            const tagNameButton = CleePIX.liveDom.instancePanel
+                .querySelector<HTMLButtonElement>(`div.tag-select-panel button.tag-name[data-tag-id='${selectedTag[1]}']`);
+            if ( !currentTagNameWrap ) currentTagNameWrap = {};
+            if ( tagNameButton && tagNameButton.parentNode ) {
+              currentTagNameWrap[ Number( selectedTag[0] ) ] = <HTMLSpanElement>tagNameButton.parentNode;
+            }
+          });
+        }
+
         setTagEvent({expansionButtonList, tagNameButtonList, tagMenuButtonList});
       } else {
         CleePIX.instanceDBs.forEach(db => {
@@ -1104,14 +1124,18 @@ export const CleePIX: {
       insertCe.innerHTML = "";
       bookmarks.forEach(( bookmark ) => {
         const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
+        const content = bookmarkItem.querySelector<HTMLDivElement>('div.content')!;
         const link = document.createElement('a');
         link.href = bookmark.url;
         link.textContent = bookmark.title;
         link.target = '_blank';
         const img = document.createElement('img');
         img.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: bookmark.thunb_mime }) );
-        bookmarkItem.appendChild( img );
-        bookmarkItem.appendChild( link );
+        const description = document.createElement('p');
+        description.textContent = bookmark.description;
+        content.appendChild( img );
+        content.appendChild( link );
+        content.appendChild( description );
         insertCe.appendChild( bookmarkItem );
       });
 

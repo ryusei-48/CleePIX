@@ -1,6 +1,6 @@
 import {app, shell, BrowserWindow, ipcMain} from 'electron';
 import Store from 'electron-store';
-import { join, resolve } from 'path'
+import { join } from 'path'
 import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
@@ -14,7 +14,8 @@ export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
   cache?: {
     currentInstanceId: number,
-    tagTreeDomStrings: { [key: number]: string } | null
+    tagTreeDomStrings: { [key: number]: string } | null,
+    selectedTags: { [key: number]: number } | null
   }
 }
 
@@ -57,7 +58,9 @@ const CleePIX: {
           label: 'main', id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
         }],
-        cache: { currentInstanceId: 1, tagTreeDomStrings: null }
+        cache: {
+          currentInstanceId: 1, tagTreeDomStrings: null, selectedTags: null
+        }
       }
     }
 
@@ -167,8 +170,9 @@ const CleePIX: {
       this.config.set('cache', this.configTemp.cache);
     });
 
-    ipcMain.handle('set-tag-tree-cache', (_, domString) => {
-      this.configTemp.cache!.tagTreeDomStrings = domString;
+    ipcMain.on('set-tag-tree-cache', (_, cache) => {
+      this.configTemp.cache!.tagTreeDomStrings = cache.tagTreeCache;
+      this.configTemp.cache!.selectedTags = cache.selectedTags;
       this.config.set('cache', this.configTemp.cache);
     });
 
@@ -321,7 +325,7 @@ const CleePIX: {
     getInstanceDatabasePath: function ( instanceId ) {
 
       let databasePath: string | null = null;
-      CleePIX.config.store.instance!.forEach((ite, index) => {
+      CleePIX.config.store.instance!.forEach((ite) => {
         if ( ite.id === instanceId ) {
           databasePath = ite.path; return;
         }
@@ -584,7 +588,7 @@ function randomString(len: number = 10): string {
   return result;
 }
 
-function getStrDatetime() {
+/*function getStrDatetime() {
 
   const date = new Date();
 
@@ -596,7 +600,7 @@ function getStrDatetime() {
   const s = ('0' + date.getSeconds()).slice(-2);
 
   return y + '-' + m + '-' + d + ' ' + h + ':' + mi + ':' + s;
-}
+}*/
 
 async function getWebImage( url: string ): Promise<Buffer | null> {
 

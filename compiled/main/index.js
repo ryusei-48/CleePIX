@@ -100,7 +100,11 @@ const CleePIX = {
           id: 2,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
         }],
-        cache: { currentInstanceId: 1, tagTreeDomStrings: null }
+        cache: {
+          currentInstanceId: 1,
+          tagTreeDomStrings: null,
+          selectedTags: null
+        }
       };
     }
     this.configTemp = this.config.store;
@@ -131,13 +135,13 @@ const CleePIX = {
       } else
         return false;
       async function importBookmarks(databasePath, bookmarks2) {
-        return new Promise(async (resolve2) => {
+        return new Promise(async (resolve) => {
           if (databasePath) {
             importBookmarksWorker({
               workerData: { dbPath: databasePath, bookmarks: bookmarks2 }
-            }).on("message", resolve2);
+            }).on("message", resolve);
           } else
-            resolve2(false);
+            resolve(false);
         });
       }
     });
@@ -151,10 +155,10 @@ const CleePIX = {
         ).all();
       }
       async function getBookmarks(dbPath, tagIdChain) {
-        return new Promise((resolve2) => {
+        return new Promise((resolve) => {
           getBookmarksWorker({
             workerData: { dbPath, tagIdChain }
-          }).on("message", resolve2);
+          }).on("message", resolve);
         });
       }
     });
@@ -191,8 +195,9 @@ const CleePIX = {
       this.configTemp.cache.currentInstanceId = id;
       this.config.set("cache", this.configTemp.cache);
     });
-    electron.ipcMain.handle("set-tag-tree-cache", (_, domString) => {
-      this.configTemp.cache.tagTreeDomStrings = domString;
+    electron.ipcMain.on("set-tag-tree-cache", (_, cache) => {
+      this.configTemp.cache.tagTreeDomStrings = cache.tagTreeCache;
+      this.configTemp.cache.selectedTags = cache.selectedTags;
       this.config.set("cache", this.configTemp.cache);
     });
     electron.ipcMain.handle("add-instance", () => {
@@ -339,7 +344,7 @@ const CleePIX = {
   shareParts: {
     getInstanceDatabasePath: function(instanceId) {
       let databasePath = null;
-      CleePIX.config.store.instance.forEach((ite, index) => {
+      CleePIX.config.store.instance.forEach((ite) => {
         if (ite.id === instanceId) {
           databasePath = ite.path;
           return;
@@ -348,7 +353,7 @@ const CleePIX = {
       return databasePath;
     },
     getWebpageMetadata: async function(url) {
-      return new Promise(async (resolve2) => {
+      return new Promise(async (resolve) => {
         if (CleePIX.Windows.forScraping === null) {
           CleePIX.Windows.forScraping = new electron.BrowserWindow({
             width: 1360,
@@ -366,10 +371,10 @@ const CleePIX = {
               return;
             });
           } else
-            resolve2(null);
+            resolve(null);
         } catch (e) {
           console.log(e);
-          resolve2(null);
+          resolve(null);
         }
         CleePIX.Windows.forScraping?.webContents.executeJavaScript(`[document.head.innerHTML, document.body.innerHTML]`, true).then(async (dom) => {
           const cheerio = await __vitePreload(() => import("cheerio"), false ? "__VITE_PRELOAD__" : void 0);
@@ -378,13 +383,13 @@ const CleePIX = {
           if (description === void 0)
             description = parser(`meta[name="description"]`).attr("content");
           const image = parser(`meta[property='og:image']`).attr("content");
-          resolve2({
+          resolve({
             title: parser("title").text(),
             description: description ? description : "",
             image: image ? image : null
           });
         }).catch(() => {
-          resolve2(null);
+          resolve(null);
         });
       });
     },
@@ -604,7 +609,7 @@ function randomString(len = 10) {
   return result;
 }
 async function getWebImage(url) {
-  return new Promise((resolve2) => {
+  return new Promise((resolve) => {
     axios.get(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
@@ -612,10 +617,10 @@ async function getWebImage(url) {
       responseType: "arraybuffer",
       timeout: 6e3
     }).then(async (response) => {
-      resolve2(Buffer.from(response.data));
+      resolve(Buffer.from(response.data));
     }).catch((err) => {
       console.log(err);
-      resolve2(null);
+      resolve(null);
     });
   });
 }

@@ -5,7 +5,7 @@ export const includeDom: {
   instancePanel: () => HTMLDivElement,
   addAppSetings: () => HTMLDivElement,
   addInstance: () => HTMLDivElement,
-  addTagBlock: ( inputId: string | null ) => HTMLDivElement,
+  addTagBlock: ( inputId?: string | null ) => HTMLDivElement,
   addBookmarkSeelector: () => HTMLDivElement,
   addRssFeedSeelector: () => HTMLDivElement,
   addTextSelector: () => HTMLDivElement,
@@ -261,7 +261,10 @@ export const includeDom: {
     bookmarkItem: function () {
 
       const dom = includeDom.initDivDom( false );
-      dom.classList.add('bookmark-item');
+      dom.classList.add('bookmark-item', 'animate__animated', 'animate__fadeIn');
+      dom.innerHTML = `
+        <div class="content"></div>
+      `;
       return dom;
     }
   }
