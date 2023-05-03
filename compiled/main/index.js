@@ -27,51 +27,27 @@ const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3-multiple-ciphers");
 const node_worker_threads = require("node:worker_threads");
+const cheerio = require("cheerio");
 const axios = require("axios");
-const scriptRel = "modulepreload";
-const assetsURL = function(dep) {
-  return "/" + dep;
-};
-const seen = {};
-const __vitePreload = function preload(baseModule, deps, importerUrl) {
-  if (true) {
-    return baseModule();
-  }
-  const links = document.getElementsByTagName("link");
-  return Promise.all(deps.map((dep) => {
-    dep = assetsURL(dep);
-    if (dep in seen)
-      return;
-    seen[dep] = true;
-    const isCss = dep.endsWith(".css");
-    const cssSelector = isCss ? '[rel="stylesheet"]' : "";
-    const isBaseRelative = !!importerUrl;
-    if (isBaseRelative) {
-      for (let i = links.length - 1; i >= 0; i--) {
-        const link2 = links[i];
-        if (link2.href === dep && (!isCss || link2.rel === "stylesheet")) {
-          return;
-        }
+const fileTypeCjsFix = require("file-type-cjs-fix");
+const bookmarkFileParser = require("bookmark-file-parser");
+function _interopNamespaceDefault(e) {
+  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
+  if (e) {
+    for (const k in e) {
+      if (k !== "default") {
+        const d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: () => e[k]
+        });
       }
-    } else if (document.querySelector(`link[href="${dep}"]${cssSelector}`)) {
-      return;
     }
-    const link = document.createElement("link");
-    link.rel = isCss ? "stylesheet" : scriptRel;
-    if (!isCss) {
-      link.as = "script";
-      link.crossOrigin = "";
-    }
-    link.href = dep;
-    document.head.appendChild(link);
-    if (isCss) {
-      return new Promise((res, rej) => {
-        link.addEventListener("load", res);
-        link.addEventListener("error", () => rej(new Error(`Unable to preload CSS for ${dep}`)));
-      });
-    }
-  })).then(() => baseModule());
-};
+  }
+  n.default = e;
+  return Object.freeze(n);
+}
+const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
 const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
 function importBookmarksWorker(options) {
   return new node_worker_threads.Worker(require.resolve("./import_bookmarks.js"), options);
@@ -125,8 +101,7 @@ const CleePIX = {
       return this.config.store;
     });
     electron.ipcMain.handle("import-bookmark-file", async (_, dataString) => {
-      const { parseByString } = await __vitePreload(() => import("bookmark-file-parser"), false ? "__VITE_PRELOAD__" : void 0);
-      const bookmarks = parseByString(dataString.html);
+      const bookmarks = bookmarkFileParser.parseByString(dataString.html);
       if (bookmarks.length > 0) {
         const dbPath = this.shareParts.getInstanceDatabasePath(dataString.instanceId);
         const result = await importBookmarks(dbPath, bookmarks);
@@ -340,6 +315,9 @@ const CleePIX = {
       const screenshot = await this.shareParts.getDomScreenshot(url);
       return screenshot.toPNG();
     });
+    electron.ipcMain.on("open-dev-tool", () => {
+      this.Windows.main?.webContents.openDevTools();
+    });
   },
   shareParts: {
     getInstanceDatabasePath: function(instanceId) {
@@ -352,45 +330,62 @@ const CleePIX = {
       });
       return databasePath;
     },
-    getWebpageMetadata: async function(url) {
+    getWebpageMetadata: async function(url, isStatic = true) {
       return new Promise(async (resolve) => {
-        if (CleePIX.Windows.forScraping === null) {
-          CleePIX.Windows.forScraping = new electron.BrowserWindow({
-            width: 1360,
-            height: 830,
-            show: false,
-            frame: true,
-            autoHideMenuBar: true,
-            backgroundColor: "#0f0f0f"
-          });
-        }
-        CleePIX.Windows.forScraping.webContents.audioMuted = true;
-        try {
-          if (url.match(/^(https|http):\/\/.*/)) {
-            await CleePIX.Windows.forScraping.loadURL(url).catch(() => {
-              return;
+        if (isStatic) {
+          const html = await httpRequestString(url);
+          if (html) {
+            const parser = cheerio__namespace.load(html);
+            let description = parser(`meta[property="og:description"]`).attr("content");
+            if (description === void 0)
+              description = parser(`meta[name="description"]`).attr("content");
+            const image = parser(`meta[property='og:image']`).attr("content");
+            resolve({
+              title: parser("title").text(),
+              description: description ? description : "",
+              image: image ? image : null
             });
           } else
             resolve(null);
-        } catch (e) {
-          console.log(e);
-          resolve(null);
-        }
-        CleePIX.Windows.forScraping?.webContents.executeJavaScript(`[document.head.innerHTML, document.body.innerHTML]`, true).then(async (dom) => {
-          const cheerio = await __vitePreload(() => import("cheerio"), false ? "__VITE_PRELOAD__" : void 0);
-          const parser = cheerio.load(`<html><head>${dom[0]}</head><body>${dom[1]}</body></html>`);
-          let description = parser(`meta[property="og:description"]`).attr("content");
-          if (description === void 0)
-            description = parser(`meta[name="description"]`).attr("content");
-          const image = parser(`meta[property='og:image']`).attr("content");
-          resolve({
-            title: parser("title").text(),
-            description: description ? description : "",
-            image: image ? image : null
+        } else {
+          if (CleePIX.Windows.forScraping === null) {
+            CleePIX.Windows.forScraping = new electron.BrowserWindow({
+              width: 1360,
+              height: 830,
+              show: false,
+              frame: true,
+              autoHideMenuBar: true,
+              backgroundColor: "#0f0f0f"
+            });
+          }
+          CleePIX.Windows.forScraping.webContents.audioMuted = true;
+          try {
+            if (url.match(/^(https|http):\/\/.*/)) {
+              await CleePIX.Windows.forScraping.loadURL(url).catch(() => {
+                return;
+              });
+            } else
+              resolve(null);
+          } catch (e) {
+            console.log(e);
+            resolve(null);
+          }
+          CleePIX.Windows.forScraping?.webContents.executeJavaScript("[document.head.innerHTML, document.body.innerHTML]", true).then(async (dom) => {
+            const parser = cheerio__namespace.load(`<html><head>${dom[0]}</head><body>${dom[1]}</body></html>`);
+            let description = parser(`meta[property="og:description"]`).attr("content");
+            if (description === void 0)
+              description = parser(`meta[name="description"]`).attr("content");
+            const image = parser(`meta[property='og:image']`).attr("content");
+            resolve({
+              title: parser("title").text(),
+              description: description ? description : "",
+              image: image ? image : null
+            });
+          }).catch((e) => {
+            console.log(e);
+            resolve(null);
           });
-        }).catch(() => {
-          resolve(null);
-        });
+        }
       });
     },
     getDomScreenshot: async function(url) {
@@ -425,7 +420,6 @@ const CleePIX = {
       try {
         const allBookmarks = CleePIX.storage[instanceId].db?.prepare(`SELECT * FROM bookmarks WHERE thunb IS NULL`).all();
         const updateBookmarks = CleePIX.storage[instanceId].db?.prepare(`UPDATE bookmarks SET description = ?, thunb = ?, thunb_mime = ? WHERE id = ?`);
-        const { fileTypeFromBuffer } = await __vitePreload(() => import("file-type"), false ? "__VITE_PRELOAD__" : void 0);
         let count = 0;
         for (const bookmark of allBookmarks) {
           console.log(bookmark.url);
@@ -435,7 +429,7 @@ const CleePIX = {
           if (metadata && metadata.image) {
             const imageBuffer = await getWebImage(metadata.image);
             if (imageBuffer) {
-              const type = await fileTypeFromBuffer(imageBuffer);
+              const type = await fileTypeCjsFix.fromBuffer(imageBuffer);
               updateBookmarks?.run(
                 metadata.description,
                 type && type.mime.match(/^image\//) ? imageBuffer : null,
@@ -615,9 +609,25 @@ async function getWebImage(url) {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
       },
       responseType: "arraybuffer",
-      timeout: 6e3
+      timeout: 0
     }).then(async (response) => {
       resolve(Buffer.from(response.data));
+    }).catch((err) => {
+      console.log(err);
+      resolve(null);
+    });
+  });
+}
+async function httpRequestString(url) {
+  return new Promise((resolve) => {
+    axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
+      },
+      responseType: "text",
+      timeout: 0
+    }).then((response) => {
+      resolve(response.data);
     }).catch((err) => {
       console.log(err);
       resolve(null);

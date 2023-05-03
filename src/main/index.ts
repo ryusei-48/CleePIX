@@ -7,8 +7,10 @@ import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
 import importBookmarksWorker from "./thread-scripts/import-bookmarks?nodeWorker";
 import getBookmarksWorker from './thread-scripts/get-bookmarks?nodeWorker';
+import * as cheerio from "cheerio";
 import axios from "axios";
-import { IBaseMark } from "bookmark-file-parser";
+import { fromBuffer } from 'file-type-cjs-fix';
+import { parseByString, IBaseMark } from "bookmark-file-parser";
 
 export type storeConfig = {
   instance?: { label: string, id: number, path: string }[],
@@ -34,7 +36,7 @@ const CleePIX: {
   createWindowInstance: () => BrowserWindow,
   shareParts: {
     getInstanceDatabasePath: ( instanceId: number ) => string | null,
-    getWebpageMetadata: ( url: string ) => Promise<{
+    getWebpageMetadata: ( url: string, isStatic?: boolean ) => Promise<{
       title: string, description: string, image: string | null
     } | null>,
     getDomScreenshot: ( url: string ) => Promise<Electron.NativeImage | undefined>,
@@ -90,7 +92,6 @@ const CleePIX: {
     });
 
     ipcMain.handle('import-bookmark-file', async (_, dataString) => {
-      const { parseByString } = await import('bookmark-file-parser');
       const bookmarks = parseByString(dataString.html);
       if (bookmarks.length > 0) {
         const dbPath = this.shareParts.getInstanceDatabasePath( dataString.instanceId );
@@ -318,6 +319,10 @@ const CleePIX: {
       const screenshot = await this.shareParts.getDomScreenshot( url );
       return screenshot!.toPNG();
     });
+
+    ipcMain.on('open-dev-tool', () => {
+      this.Windows.main?.webContents.openDevTools();
+    });
   },
 
   shareParts: {
@@ -333,35 +338,17 @@ const CleePIX: {
       return databasePath;
     },
 
-    getWebpageMetadata: async function ( url ) {
+    getWebpageMetadata: async function ( url, isStatic = true ) {
 
       return new Promise<{
         title: string, description: string, image: string | null
       } | null>( async (resolve) => {
 
-        if ( CleePIX.Windows.forScraping === null ) {
-          CleePIX.Windows.forScraping = new BrowserWindow({
-            width: 1360, height: 830,
-            show: false, frame: true,
-            autoHideMenuBar: true,
-            backgroundColor: "#0f0f0f",
-          });
-        }
+        if ( isStatic ) {
 
-        CleePIX.Windows.forScraping.webContents.audioMuted = true;
-
-        try {
-          if ( url.match(/^(https|http):\/\/.*/) ) {
-            await CleePIX.Windows.forScraping.loadURL( url )
-              .catch(() => { return; });
-          }else resolve( null );
-        }catch (e) { console.log(e); resolve( null ) }
-
-        CleePIX.Windows.forScraping?.webContents
-          .executeJavaScript(`[document.head.innerHTML, document.body.innerHTML]`, true)
-          .then( async ( dom ) => {
-            const cheerio = await import('cheerio');
-            const parser = cheerio.load( `<html><head>${ dom[0] }</head><body>${ dom[1] }</body></html>` )
+          const html = await httpRequestString( url );
+          if ( html ) {
+            const parser = cheerio.load( html );
             let description = parser(`meta[property="og:description"]`).attr('content');
             if (description === undefined) description = parser(`meta[name="description"]`).attr('content');
             const image = parser(`meta[property='og:image']`).attr('content');
@@ -369,7 +356,41 @@ const CleePIX: {
               title: parser('title').text(), description: description ? description : '',
               image: image ? image : null
             });
-          }).catch(() => { resolve( null ) })
+          }else resolve( null );
+
+        }else {
+
+          if ( CleePIX.Windows.forScraping === null ) {
+            CleePIX.Windows.forScraping = new BrowserWindow({
+              width: 1360, height: 830,
+              show: false, frame: true,
+              autoHideMenuBar: true,
+              backgroundColor: "#0f0f0f",
+            });
+          }
+  
+          CleePIX.Windows.forScraping.webContents.audioMuted = true;
+  
+          try {
+            if ( url.match(/^(https|http):\/\/.*/) ) {
+              await CleePIX.Windows.forScraping.loadURL( url )
+                .catch(() => { return; });
+            }else resolve( null );
+          }catch (e) { console.log(e); resolve( null ) }
+  
+          CleePIX.Windows.forScraping?.webContents
+            .executeJavaScript('[document.head.innerHTML, document.body.innerHTML]', true)
+            .then( async ( dom ) => {
+              const parser = cheerio.load( `<html><head>${ dom[0] }</head><body>${ dom[1] }</body></html>` )
+              let description = parser(`meta[property="og:description"]`).attr('content');
+              if (description === undefined) description = parser(`meta[name="description"]`).attr('content');
+              const image = parser(`meta[property='og:image']`).attr('content');
+              resolve({
+                title: parser('title').text(), description: description ? description : '',
+                image: image ? image : null
+              });
+            }).catch((e) => { console.log(e); resolve( null ) })
+        }
       });
     },
 
@@ -407,7 +428,6 @@ const CleePIX: {
         const allBookmarks = CleePIX.storage[ instanceId ].db?.prepare(`SELECT * FROM bookmarks WHERE thunb IS NULL`).all();
         const updateBookmarks = CleePIX.storage[ instanceId ].db
           ?.prepare(`UPDATE bookmarks SET description = ?, thunb = ?, thunb_mime = ? WHERE id = ?`);
-        const { fileTypeFromBuffer } = await import('file-type');
         let count: number = 0;
         for ( const bookmark of allBookmarks! ) {
           console.log(bookmark.url);
@@ -417,7 +437,7 @@ const CleePIX: {
           if ( metadata && metadata.image ) {
             const imageBuffer = await getWebImage( metadata.image );
             if ( imageBuffer ) {
-              const type = await fileTypeFromBuffer( imageBuffer! );
+              const type = await fromBuffer( imageBuffer! );
               updateBookmarks?.run(
                 metadata.description, 
                 type && type.mime.match(/^image\//) ? imageBuffer! : null,
@@ -611,9 +631,25 @@ async function getWebImage( url: string ): Promise<Buffer | null> {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
       },
       responseType: 'arraybuffer',
-      timeout: 6000
+      timeout: 0
     }).then( async ( response ) => {
       resolve( Buffer.from( response.data ) );
+    }).catch((err) => { console.log(err); resolve( null ) });
+  });
+}
+
+async function httpRequestString( url: string ): Promise<string | null> {
+
+  return new Promise<string | null>((resolve) => {
+
+    axios.get( url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
+      },
+      responseType: 'text',
+      timeout: 0
+    }).then( ( response ) => {
+      resolve( response.data );
     }).catch((err) => { console.log(err); resolve( null ) });
   });
 }

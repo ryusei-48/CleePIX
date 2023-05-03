@@ -6,9 +6,16 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin(),
-      bytecodePlugin({ protectedStrings: [ "ready-to-show" ] })
+      bytecodePlugin({ protectedStrings: [ "ready-to-show" ], chunkAlias: [ "index", "import_bookmarks", "get_bookmarks" ] })
     ],
     build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, './src/main/index.ts'),
+          import_bookmarks: resolve(__dirname, './src/main/thread-scripts/import-bookmarks.ts'),
+          get_bookmarks: resolve(__dirname, './src/main/thread-scripts/get-bookmarks.ts')
+        }
+      },
       minify: true,
       outDir: './compiled/main'
     }

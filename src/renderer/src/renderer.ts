@@ -118,6 +118,8 @@ export const CleePIX: {
             img.src = window.URL.createObjectURL( new Blob([res], { type: 'image/png' }) );
             insertImage.appendChild( img );
           });
+      }else if ( e.ctrlKey && e.altKey && e.code === 'KeyD' ) {
+        window.electron.ipcRenderer.send('open-dev-tool');
       }
     });
 
@@ -319,6 +321,7 @@ export const CleePIX: {
         window.electron.ipcRenderer
           .invoke('get-site-metadata', url)
           .then(response => {
+            console.log( response );
             if (response !== null) {
               titleInput.value = response.title;
               descriptionInput.textContent = response.description.replace(/ |　/g, '');

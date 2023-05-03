@@ -28,6 +28,7 @@
     "cheerio": "^1.0.0-rc.12",
     "electron-store": "^8.1.0",
     "file-type": "^18.2.1",
+    "file-type-cjs-fix": "^1.1.1",
     "image-type": "^5.2.0",
     "puppeteer-core": "^19.11.1"
   },
