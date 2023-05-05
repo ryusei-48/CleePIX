@@ -83,6 +83,7 @@ const CleePIX = {
         }
       };
     }
+    electron.nativeTheme.themeSource = "dark";
     this.configTemp = this.config.store;
     this.config.store.instance.forEach((db) => {
       this.initializeDB(db);
@@ -137,6 +138,12 @@ const CleePIX = {
         });
       }
     });
+    electron.ipcMain.handle("register-bookmark", (_, registerData) => {
+      this.storage[registerData.instanceId].db?.prepare(
+        `INSERT INTO bookmarks( url, title, description, data, memo, thumb, thunb_mime )
+          VALUES( $url, $title, $description, $memo, $thumb, $thunb_mime )`
+      );
+    });
     electron.ipcMain.on("window-close", () => {
       Object.values(this.storage).forEach((value) => {
         value.db?.close();
@@ -170,9 +177,9 @@ const CleePIX = {
       this.configTemp.cache.currentInstanceId = id;
       this.config.set("cache", this.configTemp.cache);
     });
-    electron.ipcMain.on("set-tag-tree-cache", (_, cache) => {
-      this.configTemp.cache.tagTreeDomStrings = cache.tagTreeCache;
-      this.configTemp.cache.selectedTags = cache.selectedTags;
+    electron.ipcMain.handle("set-tag-tree-cache", (_, cache) => {
+      this.configTemp.cache.tagTreeDomStrings = cache ? cache.tagTreeCache : null;
+      this.configTemp.cache.selectedTags = cache ? cache.selectedTags : null;
       this.config.set("cache", this.configTemp.cache);
     });
     electron.ipcMain.handle("add-instance", () => {
@@ -314,6 +321,9 @@ const CleePIX = {
     electron.ipcMain.handle("get-dom-screenshot", async (_, url) => {
       const screenshot = await this.shareParts.getDomScreenshot(url);
       return screenshot.toPNG();
+    });
+    electron.ipcMain.on("window-reload", () => {
+      this.Windows.main?.webContents.reloadIgnoringCache();
     });
     electron.ipcMain.on("open-dev-tool", () => {
       this.Windows.main?.webContents.openDevTools();
@@ -554,6 +564,9 @@ const CleePIX = {
         ).run(6, i);
       }
     };
+    if (!fs.existsSync(USER_DATA_PATH + "/storage")) {
+      fs.mkdirSync(USER_DATA_PATH + "/storage");
+    }
     if (!fs.existsSync(STORAGE_PATH)) {
       fs.mkdir(STORAGE_PATH, (err) => {
         if (err === null) {
@@ -625,7 +638,7 @@ async function httpRequestString(url) {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36"
       },
       responseType: "text",
-      timeout: 0
+      timeout: 5e3
     }).then((response) => {
       resolve(response.data);
     }).catch((err) => {

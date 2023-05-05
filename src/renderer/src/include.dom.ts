@@ -175,7 +175,7 @@ export const includeDom: {
               <input type="file" id="add-bookmark-thumb">
               <span>※ご自身でサムネイル画像を設定したい場合</span>
             </div>
-            <div class="label"><label>説明</label></div>
+            <div class="label"><label for="add-bookmark-description">説明</label></div>
             <div class="form description">
               <div class="description-input">
                 <textarea id="add-bookmark-description" placeholder="ページの説明を入力"></textarea>
@@ -184,6 +184,8 @@ export const includeDom: {
                 <span class="no-thumb">No thumbnail</span>
               </div>
             </div>
+            <div class="label"><label for="add-bookmark-memo">メモ</label></div>
+            <div class="form memo"><textarea id="add-bookmark-memo" placeholder="メモを入力"></textarea></div>
             <div class="label"><label for="add-bookmark-tags">タグ</label></div>
             <div class="form tags"></div>
             <button class="send-btn" id="add-bookmark-btn">追加</button>
@@ -263,7 +265,11 @@ export const includeDom: {
       const dom = includeDom.initDivDom( false );
       dom.classList.add('bookmark-item', 'animate__animated', 'animate__fadeIn');
       dom.innerHTML = `
-        <div class="content"></div>
+        <div class="content">
+          <div class="thumbnail"></div>
+          <a class="link" href="#" target="_blank"></a>
+          <p class="description"></p>
+        </div>
       `;
       return dom;
     }

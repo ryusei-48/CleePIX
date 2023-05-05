@@ -179,7 +179,7 @@ export const CleePIX: {
                 CleePIX.shareParts.toggleLoadingEfect( false );
                 if ( Array.isArray( res ) ) {
                   await window.electron.ipcRenderer.invoke('set-tag-tree-cache', null);
-                  window.location.reload();
+                  window.electron.ipcRenderer.send('window-reload');
                 }
               });
             };
@@ -1025,7 +1025,7 @@ export const CleePIX: {
             selectedTags[ instanceId ] = Number( button.dataset.tagId );
           }
         }
-        window.electron.ipcRenderer.send('set-tag-tree-cache', { tagTreeCache, selectedTags });
+        window.electron.ipcRenderer.invoke('set-tag-tree-cache', { tagTreeCache, selectedTags });
       }
 
       CleePIX.liveDom.instancePanel
@@ -1127,18 +1127,31 @@ export const CleePIX: {
       insertCe.innerHTML = "";
       bookmarks.forEach(( bookmark ) => {
         const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
-        const content = bookmarkItem.querySelector<HTMLDivElement>('div.content')!;
-        const link = document.createElement('a');
+        const thumbnail = bookmarkItem.querySelector<HTMLDivElement>('div.thumbnail')!;
+        const link = bookmarkItem.querySelector<HTMLLinkElement>('a.link')!;
+        const description = bookmarkItem.querySelector<HTMLParagraphElement>('p.description')!;
+
+        if ( bookmark.thunb ) {
+          const image = document.createElement('img');
+          image.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: bookmark.thunb_mime }) );
+          image.alt = 'サムネイル画像';
+          thumbnail.appendChild( image );
+        }else {
+          const span = document.createElement('span');
+          span.classList.add('no-thumbnail');
+          span.textContent = 'No thumbnail';
+          thumbnail.appendChild( span );
+        }
+
         link.href = bookmark.url;
         link.textContent = bookmark.title;
-        link.target = '_blank';
-        const img = document.createElement('img');
-        img.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: bookmark.thunb_mime }) );
-        const description = document.createElement('p');
-        description.textContent = bookmark.description;
-        content.appendChild( img );
-        content.appendChild( link );
-        content.appendChild( description );
+
+        let descriptionString: string = '';
+        if ( bookmark.description && bookmark.description.length > 85 ) {
+          descriptionString = (<string>bookmark.description).substring(0, 85) + '...';
+        }else descriptionString = bookmark.description;
+        description.textContent = descriptionString;
+
         insertCe.appendChild( bookmarkItem );
       });
 

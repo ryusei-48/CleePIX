@@ -1,4 +1,4 @@
-import {app, shell, BrowserWindow, ipcMain} from 'electron';
+import {app, shell, BrowserWindow, ipcMain, nativeTheme} from 'electron';
 import Store from 'electron-store';
 import { join } from 'path'
 import fs from "fs";
@@ -66,6 +66,8 @@ const CleePIX: {
       }
     }
 
+    nativeTheme.themeSource = 'dark';
+
     this.configTemp = this.config.store;
 
     this.config.store.instance!.forEach(db => {
@@ -131,6 +133,18 @@ const CleePIX: {
       }
     });
 
+    ipcMain.handle('register-bookmark', (_, registerData) => {
+      const bookmarkTable = this.storage[ registerData.instanceId ].db?.prepare(
+        `INSERT INTO bookmarks( url, title, description, data, memo, thumb, thunb_mime ) VALUES( ?, ?, ?, ?, ?, ?, ? )`
+      );
+      return bookmarkTable?.run(
+        registerData.bookmark.url, registerData.bookmark.title,
+        registerData.bookmark.description, registerData.bookmark.data,
+        registerData.bookmark.memo, registerData.bookmark.thunb,
+        registerData.bookmark.thunb_mime
+      );
+    });
+
     ipcMain.on('window-close', () => {
       Object.values(this.storage).forEach(value => {
         value.db?.close();
@@ -171,9 +185,9 @@ const CleePIX: {
       this.config.set('cache', this.configTemp.cache);
     });
 
-    ipcMain.on('set-tag-tree-cache', (_, cache) => {
-      this.configTemp.cache!.tagTreeDomStrings = cache.tagTreeCache;
-      this.configTemp.cache!.selectedTags = cache.selectedTags;
+    ipcMain.handle('set-tag-tree-cache', (_, cache) => {
+      this.configTemp.cache!.tagTreeDomStrings = cache ? cache.tagTreeCache : null;
+      this.configTemp.cache!.selectedTags = cache ? cache.selectedTags : null;
       this.config.set('cache', this.configTemp.cache);
     });
 
@@ -320,6 +334,10 @@ const CleePIX: {
       return screenshot!.toPNG();
     });
 
+    ipcMain.on('window-reload', () => {
+      this.Windows.main?.webContents.reloadIgnoringCache();
+    });
+
     ipcMain.on('open-dev-tool', () => {
       this.Windows.main?.webContents.openDevTools();
     });
@@ -463,6 +481,7 @@ const CleePIX: {
 
     this.storage[storage.id] = {}
     this.storage[storage.id].stmt = {}
+
     if (fs.existsSync(STORAGE_PATH) && fs.existsSync(storage.path)) {
       this.storage[storage.id].db = new Database(storage.path); return;
     }
@@ -551,6 +570,10 @@ const CleePIX: {
       }
     }
 
+    if ( !fs.existsSync(USER_DATA_PATH + '/storage') ) {
+      fs.mkdirSync(USER_DATA_PATH + '/storage');
+    }
+
     if (!fs.existsSync(STORAGE_PATH)) {
       fs.mkdir(STORAGE_PATH, (err) => {
         if (err === null) {initDB();}
@@ -572,7 +595,7 @@ const CleePIX: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false, webviewTag: true
       }
-    })
+    });
 
     window.on('ready-to-show', () => {
       window.show()
@@ -647,7 +670,7 @@ async function httpRequestString( url: string ): Promise<string | null> {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'
       },
       responseType: 'text',
-      timeout: 0
+      timeout: 5000
     }).then( ( response ) => {
       resolve( response.data );
     }).catch((err) => { console.log(err); resolve( null ) });
