@@ -95,18 +95,6 @@ export const CleePIX: {
       if ( e.ctrlKey && e.shiftKey && e.code === 'KeyA' ) {
         window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId)
           .then((result) => { console.log(result) });
-      }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyS' ) {
-        window.electron.ipcRenderer.invoke('get-webpage-image', 'https://social-cdn.vivaldi.net/system/site_uploads/files/000/000/004/@1x/902e27b9949777ad.png')
-          .then((buffer) => {
-            console.log(buffer);
-            const insertImage = this.liveDom.addAppSeting
-                .querySelector<HTMLSpanElement>('span#test-img')!;
-            const img = document.createElement('img');
-            img.style.width = '400px';
-            img.style.aspectRatio = '16 / 9';
-            img.src = window.URL.createObjectURL( new Blob([buffer], { type: 'image/png' }) );
-            insertImage.appendChild( img );
-      });
       }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyD' ) {
         window.electron.ipcRenderer.invoke('get-dom-screenshot', 'https://gigazine.net')
           .then((res) => {
@@ -314,28 +302,74 @@ export const CleePIX: {
       const urlInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-url')!;
       const titleInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-title')!;
       const descriptionInput = CleePIX.liveDom.addBookmark.querySelector<HTMLTextAreaElement>('#add-bookmark-description')!;
+      const screenshotButton = CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('#add-bookmark-screenshot')!;
+      const thumbnailButton = CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('#add-bookmark-general-thunb')!;
       const thumbPreview = CleePIX.liveDom.addBookmark.querySelector<HTMLDivElement>('div.view-thumb')!;
-      const noThumbElement = <HTMLSpanElement> (thumbPreview.childNodes)[0];
+      const noThumbElement = thumbPreview.innerHTML;
+
+      let thumbnail: { data: Buffer, mimeType: string } | null = null;
+      let imageURL: string | null = null;
+
       urlInput.addEventListener('change', (e) => {
         const url = (<HTMLInputElement> e.target).value;
+        if ( !validationString('url', url) ) return;
         window.electron.ipcRenderer
           .invoke('get-site-metadata', url)
           .then(response => {
-            console.log( response );
             if (response !== null) {
               titleInput.value = response.title;
               descriptionInput.textContent = response.description.replace(/ |　/g, '');
+              imageURL = null;
 
-              thumbPreview.innerHTML = '';
-              if (response.image !== undefined) {
-                const img = document.createElement('img');
-                img.src = response.image;
-                img.alt = 'サムネイル画像のプレビュー';
-                thumbPreview.append(img);
-              } else thumbPreview.append(noThumbElement);
+              if (response.image) {
+                setThumbnailGeneral( response.image );
+                imageURL = response.image;
+              } else setThumbnailScreenshot();
             }
           });
       });
+
+      thumbnailButton.addEventListener('click', () => { setThumbnailGeneral( imageURL ) });
+
+      screenshotButton.addEventListener('click', () => {
+
+        if ( !validationString('url', urlInput.value) ) return;
+        screenshotButton.disabled = true;
+        setThumbnailScreenshot( screenshotButton );
+      });
+
+      function setThumbnailGeneral( url: string | null ) {
+
+        const img = document.createElement('img');
+        img.alt = 'サムネイル画像のプレビュー';
+        thumbPreview.innerHTML = '';
+
+        if ( url ) {
+          window.electron.ipcRenderer.invoke('get-webpage-image', url)
+            .then((response) => {
+              if ( response ) {
+                img.src = window.URL.createObjectURL( new Blob([response.data], {type: response.mimeType}) );
+                thumbnail = response;
+                thumbPreview.append(img);
+              }else thumbPreview.innerHTML = noThumbElement;
+            });
+        }else thumbPreview.innerHTML = noThumbElement;
+      }
+
+      function setThumbnailScreenshot( button?: HTMLButtonElement ) {
+
+        window.electron.ipcRenderer.invoke('get-dom-screenshot', urlInput.value)
+          .then((image) => {
+            const img = document.createElement('img');
+            img.src = window.URL.createObjectURL( new Blob([image], { type: 'image/png' }) );
+            img.alt = 'サムネイル画像のプレビュー';
+            thumbPreview.innerHTML = '';
+            thumbPreview.append( img );
+            thumbnail = { data: image, mimeType: 'image/png' }
+
+            if ( button ) button.disabled = false;
+          });
+      }
 
       CleePIX.liveDom.instancePanel.insertAdjacentElement('afterend', CleePIX.liveDom.addBookmark);
     },
@@ -1173,6 +1207,16 @@ export const CleePIX: {
         showLoadingEfect!.classList.remove('show');
       }
     }
+  }
+}
+
+function validationString( type: 'url' | 'mail', str: string ): boolean {
+
+  switch ( type ) {
+    case 'url':
+      return str.match(/https?:\/[\w!?/+\-_~;.,*&@#$%()'[\]]+/) ? true : false;
+    case 'mail':
+      return str.match(/[\w\-\._]+@[\w\-\._]+\.[A-Za-z]+/) ? true : false;
   }
 }
 

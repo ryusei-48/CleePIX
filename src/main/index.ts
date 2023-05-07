@@ -326,7 +326,11 @@ const CleePIX: {
     });
 
     ipcMain.handle('get-webpage-image', async (_, url) => {
-      return await getWebImage( url );
+      const buffer = await getWebImage( url );
+      const mime = buffer ? await fromBuffer( buffer ) : null;
+      if ( buffer && mime ) {
+        return { data: buffer, mimeType: mime.mime };
+      }else return null;
     });
 
     ipcMain.handle('get-dom-screenshot', async (_, url) => {
@@ -585,8 +589,8 @@ const CleePIX: {
   createWindowInstance: function () {
 
     const window = new BrowserWindow({
-      width: 1360,
-      height: 830,
+      width: 1360, minWidth: 1100,
+      height: 830, minHeight: 671,
       show: false, frame: false,
       autoHideMenuBar: true,
       backgroundColor: "#00000008",

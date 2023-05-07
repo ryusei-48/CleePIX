@@ -139,9 +139,17 @@ const CleePIX = {
       }
     });
     electron.ipcMain.handle("register-bookmark", (_, registerData) => {
-      this.storage[registerData.instanceId].db?.prepare(
-        `INSERT INTO bookmarks( url, title, description, data, memo, thumb, thunb_mime )
-          VALUES( $url, $title, $description, $memo, $thumb, $thunb_mime )`
+      const bookmarkTable = this.storage[registerData.instanceId].db?.prepare(
+        `INSERT INTO bookmarks( url, title, description, data, memo, thumb, thunb_mime ) VALUES( ?, ?, ?, ?, ?, ?, ? )`
+      );
+      return bookmarkTable?.run(
+        registerData.bookmark.url,
+        registerData.bookmark.title,
+        registerData.bookmark.description,
+        registerData.bookmark.data,
+        registerData.bookmark.memo,
+        registerData.bookmark.thunb,
+        registerData.bookmark.thunb_mime
       );
     });
     electron.ipcMain.on("window-close", () => {
@@ -316,7 +324,12 @@ const CleePIX = {
       return true;
     });
     electron.ipcMain.handle("get-webpage-image", async (_, url) => {
-      return await getWebImage(url);
+      const buffer = await getWebImage(url);
+      const mime = buffer ? await fileTypeCjsFix.fromBuffer(buffer) : null;
+      if (buffer && mime) {
+        return { data: buffer, mimeType: mime.mime };
+      } else
+        return null;
     });
     electron.ipcMain.handle("get-dom-screenshot", async (_, url) => {
       const screenshot = await this.shareParts.getDomScreenshot(url);
@@ -579,7 +592,9 @@ const CleePIX = {
   createWindowInstance: function() {
     const window = new electron.BrowserWindow({
       width: 1360,
+      minWidth: 1100,
       height: 830,
+      minHeight: 671,
       show: false,
       frame: false,
       autoHideMenuBar: true,

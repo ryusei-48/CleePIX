@@ -166,14 +166,15 @@ export const includeDom: {
           <fieldset class="forms">
             <legend>ブックマークを追加するための入力フィールド</legend>
             <div class="label"><label for="add-bookmark-url">URL</label></div>
-            <div class="form"><input type="url" id="add-bookmark-url"></div>
+            <div class="form"><input type="url" placeholder="https://example.com" id="add-bookmark-url"></div>
             <div class="label"><label for="add-bookmark-title">タイトル</label></div>
             <div class="form"><input type="text" id="add-bookmark-title"></div>
             <div class="label"><label for="add-bookmark-thumb">サムネイル</label></div>
             <div class="form">
-              <label role="button" class="add-custom-thumb" for="add-bookmark-thumb">カスタムサムネイルを設定</label>
+              <button class="add-custom-thumb" id="add-bookmark-general-thunb">標準取得</button>
+              <button class="add-custom-thumb" id="add-bookmark-screenshot">ページスクリーンショット</button>
+              <label role="button" class="add-custom-thumb" for="add-bookmark-thumb">カスタムサムネイル</label>
               <input type="file" id="add-bookmark-thumb">
-              <span>※ご自身でサムネイル画像を設定したい場合</span>
             </div>
             <div class="label"><label for="add-bookmark-description">説明</label></div>
             <div class="form description">
