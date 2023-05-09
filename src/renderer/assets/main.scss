@@ -591,11 +591,15 @@ main {
     padding: 7px;
     background-color: #242323;
     text-align: left;
-    span.selected-label > button {
+    span.selected-label > span {
       margin-right: 5px;
-      padding: 4px;
-      background-color: #555555;
+      padding: 4px 6px;
+      background-color: #6f3f00;
       border-radius: 10px;
+      cursor: default;
+      > button {
+        margin-left: 5px;
+      }
     }
     span.tag_input_wrap {
       position: relative;
@@ -825,6 +829,7 @@ fieldset.forms {
       padding-top: 5px;
       padding-left: 5px;
       padding-bottom: 5px;
+      overflow: hidden;
       span.no-thumb {
         position: absolute;
         top: 50%;
@@ -833,7 +838,10 @@ fieldset.forms {
       }
       img {
         width: 100%;
-        aspect-ratio: 16 / 9;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
     }
   }

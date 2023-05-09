@@ -302,10 +302,13 @@ export const CleePIX: {
       const urlInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-url')!;
       const titleInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-title')!;
       const descriptionInput = CleePIX.liveDom.addBookmark.querySelector<HTMLTextAreaElement>('#add-bookmark-description')!;
+      const memoInput = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bookmark-memo')!;
       const screenshotButton = CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('#add-bookmark-screenshot')!;
       const thumbnailButton = CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('#add-bookmark-general-thunb')!;
+      const customThumbnail = CleePIX.liveDom.addBookmark.querySelector<HTMLInputElement>('#add-bk-custom-thumb')!;
       const thumbPreview = CleePIX.liveDom.addBookmark.querySelector<HTMLDivElement>('div.view-thumb')!;
       const noThumbElement = thumbPreview.innerHTML;
+      const registerBookmark = CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('#add-bookmark-btn')!;
 
       let thumbnail: { data: Buffer, mimeType: string } | null = null;
       let imageURL: string | null = null;
@@ -336,6 +339,58 @@ export const CleePIX: {
         if ( !validationString('url', urlInput.value) ) return;
         screenshotButton.disabled = true;
         setThumbnailScreenshot( screenshotButton );
+      });
+
+      customThumbnail.addEventListener('change', async (e) => {
+
+        const files = (<HTMLInputElement>e.target).files;
+        if ( files && files.length == 1 && files[0].type.indexOf('image/') > -1 ) {
+          const imageBuffer = <Buffer> await files[0].arrayBuffer();
+          const mimeType = await window.electron.ipcRenderer.invoke('get-mimeType-fromBuffer', imageBuffer);
+          if ( mimeType ) {
+            const img = document.createElement('img');
+            img.alt = 'サムネイル画像のプレビュー';
+            thumbPreview.innerHTML = '';
+            img.src = window.URL.createObjectURL( new Blob([imageBuffer], {type: mimeType.mime}) );
+            thumbnail = { data: imageBuffer, mimeType: mimeType.mime }
+            thumbPreview.append(img);
+          }
+        }
+      });
+
+      registerBookmark.addEventListener('click', () => {
+
+        if ( !validationString('url', urlInput.value) ) return;
+        if ( titleInput.value == '' ) return;
+
+        const selectLabels = CleePIX.liveDom.addBookmark.querySelector<HTMLSpanElement>('span.selected-label')!;
+        if ( selectLabels.childElementCount === 0 ) return;
+
+        window.electron.ipcRenderer.invoke('register-bookmark', {
+          instanceId: CleePIX.currentInstanceId,
+          bookmark: {
+            url: urlInput.value, title: titleInput.value,
+            description: descriptionInput.value, data: null,
+            memo: memoInput.value != '' ?  memoInput.value : null,
+            thunb: thumbnail?.data ? thumbnail.data : null,
+            thunb_mime: thumbnail?.mimeType ? thumbnail.mimeType : null
+          },
+          tags: [...selectLabels.childNodes].map(tag => Number( (<HTMLSpanElement>tag).dataset.id ))
+        }).then((result) => {
+          if ( result ) {
+            urlInput.value = '';
+            titleInput.value = '';
+            descriptionInput.value = '';
+            thumbPreview.innerHTML = noThumbElement;
+            memoInput.value = '';
+            imageURL = null;
+            thumbnail = null;
+
+            console.log(result);
+
+            CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('button.modal-close')?.click();
+          }
+        });
       });
 
       function setThumbnailGeneral( url: string | null ) {
@@ -428,12 +483,22 @@ export const CleePIX: {
         };
         let arrayNumber: number = 0;
         const addTagLabel = (id: string, name: string, e: KeyboardEvent): void => {
-          const labelBtn = document.createElement('button');
+          if ( selected_label?.querySelector(`span.label[data-id="${id}"]`) ) return;
+
+          const labelBtn = document.createElement('span');
+          labelBtn.classList.add('label');
           labelBtn.textContent = name;
           labelBtn.dataset.id = id;
           labelBtn.dataset.name = name;
+
+          const delButton = document.createElement('button');
+          delButton.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+          delButton.ariaLabel = '削除';
+          delButton.addEventListener('click', () => { labelBtn.remove() });
+
           (<HTMLInputElement> e.target).value = '';
           setTimeout(() => {(<HTMLInputElement> e.target).focus();}, 300);
+          labelBtn.appendChild( delButton );
           selected_label?.append(labelBtn);
         };
 
@@ -447,6 +512,7 @@ export const CleePIX: {
         target.liveDom.querySelector<HTMLDivElement>('input.tag_input')
           ?.addEventListener('keyup', e => {
 
+            if ( e.isComposing ) return;
             if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
               if (suggest_btn.isFirst === true && e.code === 'ArrowDown') {
                 suggest_btn.doms[arrayNumber].style.backgroundColor = '#555555';
@@ -466,6 +532,10 @@ export const CleePIX: {
                 addTagLabel(suggest_btn.doms[arrayNumber].dataset.id!, suggest_btn.doms[arrayNumber].dataset.name!, e);
               }
               tag_suggest.innerHTML = ''; tag_suggest.style.opacity = '0'; tag_suggest.inert = true; tabKeyCansel = false;
+            } else if ( e.code === 'Backspace' && (<HTMLInputElement> e.target)!.value == '' ) {
+              if ( selected_label!.childElementCount > 0 ) {
+                [...selected_label!.childNodes].slice(-1)[0].remove();
+              }
             } else if ((<HTMLInputElement> e.target)!.value != '') {
               tag_suggest.innerHTML = ''; tabKeyCansel = true;
               tag_suggest.inert = false; tag_suggest.style.opacity = '1';

@@ -107,7 +107,7 @@ export const includeDom: {
             <div class="label"><label for="add-bookmark-thumb">ブックマークのインポート</label></div>
             <div class="form">
               <label role="button" class="add-custom-thumb" for="import-bookmark">ファイル選択</label>
-              <input type="file" id="import-bookmark"><br/>
+              <input type="file" accept="text/html" id="import-bookmark"><br/>
               <span>※各ブラウザーからHTML形式のエクスポートファイルを読み込みます。</span>
             </div>
           </fieldset>
@@ -173,8 +173,8 @@ export const includeDom: {
             <div class="form">
               <button class="add-custom-thumb" id="add-bookmark-general-thunb">標準取得</button>
               <button class="add-custom-thumb" id="add-bookmark-screenshot">ページスクリーンショット</button>
-              <label role="button" class="add-custom-thumb" for="add-bookmark-thumb">カスタムサムネイル</label>
-              <input type="file" id="add-bookmark-thumb">
+              <label role="button" class="add-custom-thumb" for="add-bk-custom-thumb">カスタムサムネイル</label>
+              <input type="file" accept="image/*" id="add-bk-custom-thumb">
             </div>
             <div class="label"><label for="add-bookmark-description">説明</label></div>
             <div class="form description">

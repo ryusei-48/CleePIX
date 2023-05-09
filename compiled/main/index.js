@@ -67,6 +67,9 @@ const CleePIX = {
   run: function() {
     if (this.config.size === 0) {
       this.config.store = {
+        window: {
+          main: { x: null, y: null }
+        },
         instance: [{
           label: "default",
           id: 1,
@@ -139,18 +142,32 @@ const CleePIX = {
       }
     });
     electron.ipcMain.handle("register-bookmark", (_, registerData) => {
-      const bookmarkTable = this.storage[registerData.instanceId].db?.prepare(
-        `INSERT INTO bookmarks( url, title, description, data, memo, thumb, thunb_mime ) VALUES( ?, ?, ?, ?, ?, ?, ? )`
-      );
-      return bookmarkTable?.run(
-        registerData.bookmark.url,
-        registerData.bookmark.title,
-        registerData.bookmark.description,
-        registerData.bookmark.data,
-        registerData.bookmark.memo,
-        registerData.bookmark.thunb,
-        registerData.bookmark.thunb_mime
-      );
+      try {
+        const bookmarkTable = this.storage[registerData.instanceId].db?.prepare(
+          `INSERT INTO bookmarks( url, title, description, data, memo, thunb, thunb_mime ) VALUES( ?, ?, ?, ?, ?, ?, ? )`
+        );
+        const bookmarkTagsTable = this.storage[registerData.instanceId].db?.prepare(
+          `INSERT INTO tags_bookmarks( tags_id, bookmark_id ) VALUES( ?, ? )`
+        );
+        const resultBookmark = bookmarkTable?.run(
+          registerData.bookmark.url,
+          registerData.bookmark.title,
+          registerData.bookmark.description,
+          registerData.bookmark.data,
+          registerData.bookmark.memo,
+          registerData.bookmark.thunb,
+          registerData.bookmark.thunb_mime
+        );
+        if (resultBookmark && resultBookmark.changes == 1) {
+          for (let tagId of registerData.tags) {
+            bookmarkTagsTable?.run(tagId, resultBookmark.lastInsertRowid);
+          }
+        }
+        return true;
+      } catch (e) {
+        console.log(e);
+        return false;
+      }
     });
     electron.ipcMain.on("window-close", () => {
       Object.values(this.storage).forEach((value) => {
@@ -334,6 +351,9 @@ const CleePIX = {
     electron.ipcMain.handle("get-dom-screenshot", async (_, url) => {
       const screenshot = await this.shareParts.getDomScreenshot(url);
       return screenshot.toPNG();
+    });
+    electron.ipcMain.handle("get-mimeType-fromBuffer", async (_, buffer) => {
+      return await fileTypeCjsFix.fromBuffer(buffer);
     });
     electron.ipcMain.on("window-reload", () => {
       this.Windows.main?.webContents.reloadIgnoringCache();
@@ -590,11 +610,14 @@ const CleePIX = {
       initDB();
   },
   createWindowInstance: function() {
+    const windowConfig = this.configTemp.window.main;
     const window = new electron.BrowserWindow({
       width: 1360,
       minWidth: 1100,
+      x: windowConfig.x ? windowConfig.x : void 0,
       height: 830,
       minHeight: 671,
+      y: windowConfig.y ? windowConfig.y : void 0,
       show: false,
       frame: false,
       autoHideMenuBar: true,
@@ -608,6 +631,12 @@ const CleePIX = {
     });
     window.on("ready-to-show", () => {
       window.show();
+    });
+    window.on("moved", () => {
+      const rect = window.getNormalBounds();
+      this.configTemp.window.main.x = rect.x;
+      this.configTemp.window.main.y = rect.y;
+      this.config.set("window", this.configTemp.window);
     });
     window.webContents.setWindowOpenHandler((details) => {
       electron.shell.openExternal(details.url);

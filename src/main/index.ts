@@ -13,6 +13,9 @@ import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 
 export type storeConfig = {
+  window: {
+    main: { x: number | null, y: number | null }
+  },
   instance?: { label: string, id: number, path: string }[],
   cache?: {
     currentInstanceId: number,
@@ -53,6 +56,9 @@ const CleePIX: {
     //this.config.clear();
     if (this.config.size === 0) {
       this.config.store = {
+        window: {
+          main: { x: null, y: null }
+        },
         instance: [{
           label: 'default', id: 1,
           path: STORAGE_PATH + `/ite_${randomString()}.db`
@@ -134,15 +140,29 @@ const CleePIX: {
     });
 
     ipcMain.handle('register-bookmark', (_, registerData) => {
-      const bookmarkTable = this.storage[ registerData.instanceId ].db?.prepare(
-        `INSERT INTO bookmarks( url, title, description, data, memo, thumb, thunb_mime ) VALUES( ?, ?, ?, ?, ?, ?, ? )`
-      );
-      return bookmarkTable?.run(
-        registerData.bookmark.url, registerData.bookmark.title,
-        registerData.bookmark.description, registerData.bookmark.data,
-        registerData.bookmark.memo, registerData.bookmark.thunb,
-        registerData.bookmark.thunb_mime
-      );
+      try {
+        const bookmarkTable = this.storage[ registerData.instanceId ].db?.prepare(
+          `INSERT INTO bookmarks( url, title, description, data, memo, thunb, thunb_mime ) VALUES( ?, ?, ?, ?, ?, ?, ? )`
+        );
+        const bookmarkTagsTable = this.storage[ registerData.instanceId ].db?.prepare(
+          `INSERT INTO tags_bookmarks( tags_id, bookmark_id ) VALUES( ?, ? )`
+        );
+
+        const resultBookmark = bookmarkTable?.run(
+          registerData.bookmark.url, registerData.bookmark.title,
+          registerData.bookmark.description, registerData.bookmark.data,
+          registerData.bookmark.memo, registerData.bookmark.thunb,
+          registerData.bookmark.thunb_mime
+        );
+
+        if ( resultBookmark && resultBookmark.changes == 1 ) {
+          for ( let tagId of registerData.tags ) {
+            bookmarkTagsTable?.run( tagId, resultBookmark.lastInsertRowid );
+          }
+        }
+
+        return true;
+      } catch (e) { console.log(e); return false }
     });
 
     ipcMain.on('window-close', () => {
@@ -336,6 +356,10 @@ const CleePIX: {
     ipcMain.handle('get-dom-screenshot', async (_, url) => {
       const screenshot = await this.shareParts.getDomScreenshot( url );
       return screenshot!.toPNG();
+    });
+
+    ipcMain.handle('get-mimeType-fromBuffer', async (_, buffer) => {
+      return await fromBuffer( buffer );
     });
 
     ipcMain.on('window-reload', () => {
@@ -588,9 +612,11 @@ const CleePIX: {
 
   createWindowInstance: function () {
 
+    const windowConfig = this.configTemp.window.main;
+
     const window = new BrowserWindow({
-      width: 1360, minWidth: 1100,
-      height: 830, minHeight: 671,
+      width: 1360, minWidth: 1100, x: windowConfig.x ? windowConfig.x : undefined,
+      height: 830, minHeight: 671, y: windowConfig.y ? windowConfig.y : undefined,
       show: false, frame: false,
       autoHideMenuBar: true,
       backgroundColor: "#00000008",
@@ -603,7 +629,14 @@ const CleePIX: {
 
     window.on('ready-to-show', () => {
       window.show()
-    })
+    });
+
+    window.on('moved', () => {
+      const rect = window.getNormalBounds();
+      this.configTemp.window.main.x = rect.x;
+      this.configTemp.window.main.y = rect.y;
+      this.config.set('window', this.configTemp.window);
+    });
 
     window.webContents.setWindowOpenHandler((details) => {
       shell.openExternal(details.url)
