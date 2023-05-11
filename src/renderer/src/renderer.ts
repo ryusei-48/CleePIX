@@ -383,10 +383,9 @@ export const CleePIX: {
             descriptionInput.value = '';
             thumbPreview.innerHTML = noThumbElement;
             memoInput.value = '';
+            selectLabels.innerHTML = '';
             imageURL = null;
             thumbnail = null;
-
-            console.log(result);
 
             CleePIX.liveDom.addBookmark.querySelector<HTMLButtonElement>('button.modal-close')?.click();
           }
@@ -1213,6 +1212,33 @@ export const CleePIX: {
 
     addContents: function () {
 
+      const contentElementsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.content-elements-wrap')!;
+      const pageDetailsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.page-details-wrap')!;
+
+      [...pageDetailsWrap.querySelectorAll<HTMLInputElement>('div.tab-bar > input.details-tab-radio')!]
+        .forEach( radio => {
+
+          radio.addEventListener('click', (e) => {
+
+            const activeContent = pageDetailsWrap.querySelector<HTMLDivElement>(`div.tab-contents > div.content.animate__fadeIn`)!
+            activeContent.classList.replace('animate__fadeIn', 'animate__fadeOut');
+            activeContent.inert = true;
+
+            const content = pageDetailsWrap.querySelector<HTMLDivElement>(`div.tab-contents > div.content.${ (<HTMLInputElement>e.target).value }`)!
+            content.classList.replace('animate__fadeOut', 'animate__fadeIn');
+            content.inert = false;
+          });
+        });
+
+      CleePIX.liveDom.contentsPanel.base
+        .querySelector<HTMLButtonElement>('div.page-details-content > button.close')!
+        .addEventListener('click', () => {
+
+          contentElementsWrap.classList.remove('wh-50');
+          pageDetailsWrap.classList.remove('wh-50');
+          pageDetailsWrap.inert = true;
+        });
+
       CleePIX.shareParts.toggleLoadingEfect( true );
       window.electron.ipcRenderer
         .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain: null })
@@ -1227,10 +1253,18 @@ export const CleePIX: {
 
     getBookmarkItemDom: function ( bookmarks ) {
 
+      const contentElementsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.content-elements-wrap')!;
       const insertCe = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div#insert-ce')!;
+      const pageDetailsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.page-details-wrap')!;
+      const pageDetails = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.page-details-content')!;
+      const details = pageDetails.querySelector<HTMLDivElement>('div.content.details')!;
+      const preview = details.querySelector<HTMLDivElement>('div.preview')!;
+      const browse = pageDetails.querySelector<HTMLDivElement>('div.content.browse')!;
       insertCe.innerHTML = "";
+
       bookmarks.forEach(( bookmark ) => {
         const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
+        const hoverForMouse = bookmarkItem.querySelector<HTMLDivElement>('div.hover-for-mouse')!;
         const thumbnail = bookmarkItem.querySelector<HTMLDivElement>('div.thumbnail')!;
         const link = bookmarkItem.querySelector<HTMLLinkElement>('a.link')!;
         const description = bookmarkItem.querySelector<HTMLParagraphElement>('p.description')!;
@@ -1240,7 +1274,7 @@ export const CleePIX: {
           image.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: bookmark.thunb_mime }) );
           image.alt = 'サムネイル画像';
           thumbnail.appendChild( image );
-        }else {
+        } else {
           const span = document.createElement('span');
           span.classList.add('no-thumbnail');
           span.textContent = 'No thumbnail';
@@ -1255,6 +1289,44 @@ export const CleePIX: {
           descriptionString = (<string>bookmark.description).substring(0, 85) + '...';
         }else descriptionString = bookmark.description;
         description.textContent = descriptionString;
+
+        hoverForMouse.addEventListener('click', () => {
+
+          if ( bookmark.url.match(/^https:\/\/www\.youtube\.com\/watch\?v=/) ) {
+            const url = new URL( bookmark.url );
+            const param = url.searchParams;
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://www.youtube.com/embed/${ param.get('v') }`;
+            iframe.title = bookmark.title;
+            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+            iframe.allowFullscreen = true;
+            iframe.frameBorder = '0';
+            iframe.style.width = '100%';
+            iframe.style.aspectRatio = '16 / 9';
+            preview.innerHTML = '';
+            preview.appendChild( iframe );
+          } else {
+            const image = document.createElement('img');
+            image.style.width = '100%';
+            image.src = window.URL.createObjectURL( new Blob([bookmark.thunb], { type: bookmark.thunb_mime }) );
+            image.alt = 'サムネイル画像';
+            preview.innerHTML = '';
+            preview.appendChild( image );
+          }
+
+          const webview = document.createElement('webview');
+          webview.style.width = '100%';
+          webview.style.height = '100%';
+          webview.style.display = 'inline-flex';
+          webview.setAttribute('src', bookmark.url);
+          webview.hidden = true;
+          browse.innerHTML = '';
+          browse.appendChild( webview );
+
+          contentElementsWrap.classList.add('wh-50');
+          pageDetailsWrap.classList.add('wh-50');
+          pageDetailsWrap.inert = false;
+        });
 
         insertCe.appendChild( bookmarkItem );
       });

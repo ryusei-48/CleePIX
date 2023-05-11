@@ -256,8 +256,31 @@ export const includeDom: {
     base: function () {
 
       const dom = includeDom.initDivDom( false );
-      dom.classList.add('content-elements-wrap');
-      dom.innerHTML = `<div id="insert-ce" class="content-elements"></div>`;
+      dom.classList.add('panel-wrap');
+      dom.innerHTML = `
+        <div class="content-elements-wrap">
+          <div id="insert-ce" class="content-elements"></div>
+        </div>
+        <div inert class="page-details-wrap">
+          <div class="page-details-content">
+            <div class="tab-bar">
+              <input checked type="radio" name="details-tab-radio" value="details" class="details-tab-radio" id="bk-details-tab-btn" />
+              <label role="button" for="bk-details-tab-btn">詳細情報</label>
+              <input type="radio" name="details-tab-radio" value="browse" class="details-tab-radio" id="bk-browse-tab-btn" />
+              <label role="button" for="bk-browse-tab-btn">ブラウズ</label>
+            </div>
+            <div class="tab-contents">
+              <div class="content details animate__animated animate__fadeIn">
+                <div class="preview"></div>
+              </div>
+              <div inert class="content browse animate__animated animate__fadeOut">
+                <div class="browse"></div>
+              </div>
+            </div>
+            <button class="close"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+      `;
       return dom;
     },
 
@@ -267,9 +290,14 @@ export const includeDom: {
       dom.classList.add('bookmark-item', 'animate__animated', 'animate__fadeIn');
       dom.innerHTML = `
         <div class="content">
-          <div class="thumbnail"></div>
-          <a class="link" href="#" target="_blank"></a>
-          <p class="description"></p>
+          <button class="float open-link" title="Webサイトを開く"><i class="fa-solid fa-up-right-from-square"></i></button>
+          <button class="float update-metadata" title="ページ情報を更新"><i class="fa-solid fa-rotate"></i></button>
+          <button class="float delete" title="削除"><i class="fa-regular fa-trash-can"></i></button>
+          <div class="hover-for-mouse">
+            <div class="thumbnail"></div>
+            <a class="link" href="#" target="_blank"></a>
+            <p class="description"></p>
+          </div>
         </div>
       `;
       return dom;
