@@ -1214,6 +1214,7 @@ export const CleePIX: {
 
       const contentElementsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.content-elements-wrap')!;
       const pageDetailsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.page-details-wrap')!;
+      const browse = pageDetailsWrap.querySelector<HTMLDivElement>('div.content.browse > div.browse')!;
 
       [...pageDetailsWrap.querySelectorAll<HTMLInputElement>('div.tab-bar > input.details-tab-radio')!]
         .forEach( radio => {
@@ -1227,6 +1228,11 @@ export const CleePIX: {
             const content = pageDetailsWrap.querySelector<HTMLDivElement>(`div.tab-contents > div.content.${ (<HTMLInputElement>e.target).value }`)!
             content.classList.replace('animate__fadeOut', 'animate__fadeIn');
             content.inert = false;
+
+            if ( (<HTMLInputElement>e.target).value === 'browse' ) {
+              browse.dataset.isLoaded = 'true';
+              (<HTMLElement>browse.childNodes[1]).setAttribute('src', browse.dataset.url!);
+            }
           });
         });
 
@@ -1238,6 +1244,7 @@ export const CleePIX: {
           pageDetailsWrap.classList.remove('wh-50');
           pageDetailsWrap.inert = true;
         });
+
 
       CleePIX.shareParts.toggleLoadingEfect( true );
       window.electron.ipcRenderer
@@ -1259,7 +1266,8 @@ export const CleePIX: {
       const pageDetails = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.page-details-content')!;
       const details = pageDetails.querySelector<HTMLDivElement>('div.content.details')!;
       const preview = details.querySelector<HTMLDivElement>('div.preview')!;
-      const browse = pageDetails.querySelector<HTMLDivElement>('div.content.browse')!;
+      const browse = pageDetailsWrap.querySelector<HTMLDivElement>(`div.tab-contents > div.content.browse`)!;
+      const webviewWrap = pageDetails.querySelector<HTMLDivElement>('div.content.browse > div.browse')!;
       insertCe.innerHTML = "";
 
       bookmarks.forEach(( bookmark ) => {
@@ -1314,14 +1322,12 @@ export const CleePIX: {
             preview.appendChild( image );
           }
 
-          const webview = document.createElement('webview');
-          webview.style.width = '100%';
-          webview.style.height = '100%';
-          webview.style.display = 'inline-flex';
-          webview.setAttribute('src', bookmark.url);
-          webview.hidden = true;
-          browse.innerHTML = '';
-          browse.appendChild( webview );
+          webviewWrap.dataset.url = bookmark.url;
+          webviewWrap.dataset.isLoaded = 'false';
+
+          if ( !browse.inert ) {
+            (<HTMLElement>webviewWrap.childNodes[1]).setAttribute('src', bookmark.url);
+          }
 
           contentElementsWrap.classList.add('wh-50');
           pageDetailsWrap.classList.add('wh-50');

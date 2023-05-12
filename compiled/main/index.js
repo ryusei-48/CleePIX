@@ -68,7 +68,7 @@ const CleePIX = {
     if (this.config.size === 0) {
       this.config.store = {
         window: {
-          main: { x: null, y: null }
+          main: { x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: "default",
@@ -621,7 +621,7 @@ const CleePIX = {
       show: false,
       frame: false,
       autoHideMenuBar: true,
-      backgroundColor: "#00000008",
+      backgroundColor: "black",
       ...process.platform === "linux" ? { icon } : {},
       webPreferences: {
         preload: path.join(__dirname, "../preload/index.js"),
@@ -629,6 +629,8 @@ const CleePIX = {
         webviewTag: true
       }
     });
+    if (this.configTemp.window.main.isMaximize)
+      window.maximize();
     window.on("ready-to-show", () => {
       window.show();
     });
@@ -636,6 +638,14 @@ const CleePIX = {
       const rect = window.getNormalBounds();
       this.configTemp.window.main.x = rect.x;
       this.configTemp.window.main.y = rect.y;
+      this.config.set("window", this.configTemp.window);
+    });
+    window.on("maximize", () => {
+      this.configTemp.window.main.isMaximize = true;
+      this.config.set("window", this.configTemp.window);
+    });
+    window.on("unmaximize", () => {
+      this.configTemp.window.main.isMaximize = false;
       this.config.set("window", this.configTemp.window);
     });
     window.webContents.setWindowOpenHandler((details) => {

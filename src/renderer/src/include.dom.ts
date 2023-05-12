@@ -272,9 +272,22 @@ export const includeDom: {
             <div class="tab-contents">
               <div class="content details animate__animated animate__fadeIn">
                 <div class="preview"></div>
+                <fieldset class="meta-data-list">
+                  <legend>ブックマークの詳細情報</legend>
+                  <div class="item-block">
+                    <div class="label"><label for="bk-dts-title">タイトル</label></div>
+                    <div class="input"><input type="text" id="bk-dts-title" readonly></div>
+                  </div>
+                  <div class="item-block">
+                    <div class="label"><label for="bk-dts-url">URL</label></div>
+                    <div class="input"><input type="url" id="bk-dts-url" readonly></div>
+                  </div>
+                </fieldset>
               </div>
               <div inert class="content browse animate__animated animate__fadeOut">
-                <div class="browse"></div>
+                <div class="browse" data-url="" data-is-loaded="true">
+                  <webview style="width:100%;height:100%;display:inline-flex"></webview>
+                </div>
               </div>
             </div>
             <button class="close"><i class="fa-solid fa-xmark"></i></button>

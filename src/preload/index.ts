@@ -1,4 +1,4 @@
-import { contextBridge } from 'electron'
+import { contextBridge, WebviewTagPrintOptions } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import "./index.d";
 
