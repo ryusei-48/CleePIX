@@ -1215,6 +1215,7 @@ export const CleePIX: {
       const contentElementsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.content-elements-wrap')!;
       const pageDetailsWrap = CleePIX.liveDom.contentsPanel.base.querySelector<HTMLDivElement>('div.page-details-wrap')!;
       const browse = pageDetailsWrap.querySelector<HTMLDivElement>('div.content.browse > div.browse')!;
+      const titleText = pageDetailsWrap.querySelector<HTMLTextAreaElement>('#bk-dts-title')!;
 
       [...pageDetailsWrap.querySelectorAll<HTMLInputElement>('div.tab-bar > input.details-tab-radio')!]
         .forEach( radio => {
@@ -1245,6 +1246,7 @@ export const CleePIX: {
           pageDetailsWrap.inert = true;
         });
 
+      titleText.addEventListener('input', (e) => { textareaResizer( <HTMLTextAreaElement>e.target! ) }, false);
 
       CleePIX.shareParts.toggleLoadingEfect( true );
       window.electron.ipcRenderer
@@ -1268,6 +1270,9 @@ export const CleePIX: {
       const preview = details.querySelector<HTMLDivElement>('div.preview')!;
       const browse = pageDetailsWrap.querySelector<HTMLDivElement>(`div.tab-contents > div.content.browse`)!;
       const webviewWrap = pageDetails.querySelector<HTMLDivElement>('div.content.browse > div.browse')!;
+      const titleText = pageDetails.querySelector<HTMLTextAreaElement>('#bk-dts-title')!;
+      const url = pageDetails.querySelector<HTMLInputElement>('#bk-dts-url')!;
+      const dsc = pageDetails.querySelector<HTMLTextAreaElement>('#bk-dts-dsc')!;
       insertCe.innerHTML = "";
 
       bookmarks.forEach(( bookmark ) => {
@@ -1322,6 +1327,14 @@ export const CleePIX: {
             preview.appendChild( image );
           }
 
+          titleText.value = bookmark.title;
+          setTimeout(() => { textareaResizer( titleText ) }, 300);
+
+          url.value = bookmark.url;
+
+          dsc.value = bookmark.description;
+          setTimeout(() => { textareaResizer( dsc ) }, 300);
+
           webviewWrap.dataset.url = bookmark.url;
           webviewWrap.dataset.isLoaded = 'false';
 
@@ -1356,6 +1369,11 @@ export const CleePIX: {
       }
     }
   }
+}
+
+function textareaResizer( textarea: HTMLTextAreaElement ): void {
+  textarea.style.height = '0';
+  textarea.style.height = (textarea.scrollHeight) + "px";
 }
 
 function validationString( type: 'url' | 'mail', str: string ): boolean {

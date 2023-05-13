@@ -643,15 +643,9 @@ main {
                     opacity: 0;
                   }
                   > div.item-block {
-                    display: block;
-                    width: 100%;
-                    letter-spacing: -1em;
-                    white-space: nowrap;
+                    @include flexbese($ai:center);
                     > div.label {
-                      display: inline-block;
-                      width: 20%;
-                      letter-spacing: normal;
-                      white-space: normal;
+                      flex-basis: 20%;
                       padding: 7px;
                       text-align: center;
                       > label {
@@ -661,15 +655,22 @@ main {
                       }
                     }
                     > div.input {
-                      display: inline-block;
-                      width: 80%;
+                      flex-basis: 80%;
                       padding: 7px;
-                      letter-spacing: normal;
-                      white-space: normal;
                       text-align: center;
                       > input[type="text"], input[type="url"] {
                         width: 100%;
                         font-size: 13pt;
+                        padding: 5px;
+                      }
+                      > textarea {
+                        width: 100%;
+                        font-size: 14pt;
+                        resize: none;
+                        padding: 5px;
+                        line-height: 1.5em;
+                        font-weight: bold;
+                        //transition: height .3s ease-in-out;
                       }
                     }
                   }

@@ -276,11 +276,15 @@ export const includeDom: {
                   <legend>ブックマークの詳細情報</legend>
                   <div class="item-block">
                     <div class="label"><label for="bk-dts-title">タイトル</label></div>
-                    <div class="input"><input type="text" id="bk-dts-title" readonly></div>
+                    <div class="input"><textarea id="bk-dts-title" rows="1" readonly></textarea></div>
                   </div>
                   <div class="item-block">
                     <div class="label"><label for="bk-dts-url">URL</label></div>
                     <div class="input"><input type="url" id="bk-dts-url" readonly></div>
+                  </div>
+                  <div class="item-block">
+                    <div class="label"><label for="bk-dts-dsc">説明</label></div>
+                    <div class="input"><textarea id="bk-dts-dsc" rows="1" readonly></textarea></div>
                   </div>
                 </fieldset>
               </div>
@@ -290,7 +294,7 @@ export const includeDom: {
                 </div>
               </div>
             </div>
-            <button class="close"><i class="fa-solid fa-xmark"></i></button>
+            <button class="close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
           </div>
         </div>
       `;
