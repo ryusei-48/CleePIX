@@ -10,7 +10,10 @@ declare global {
     app: typeof CleePIX;
   }
   interface WindowEventMap {
-    "ite_change": CustomEvent<{id: number;}>;
+    "ite_change": CustomEvent<{id: number}>;
+  }
+  interface HTMLElementEventMap {
+    "tag-insert": CustomEvent<{ id: number, name: string }[]>
   }
 }
 
@@ -463,7 +466,8 @@ export const CleePIX: {
 
       [
         {liveDom: CleePIX.liveDom.addBookmark, inputId: 'add-bookmark-tags'},
-        {liveDom: CleePIX.liveDom.addRssFeed, inputId: 'add-rss-tags'}
+        {liveDom: CleePIX.liveDom.addRssFeed, inputId: 'add-rss-tags'},
+        {liveDom: CleePIX.liveDom.contentsPanel.base, inputId: 'bk-dts-tags'}
       ].forEach(target => {
 
         target.liveDom.querySelector<HTMLDivElement>('div.form.tags')
@@ -481,7 +485,7 @@ export const CleePIX: {
           isFirst: true, doms: [], selected: {id: null, name: null}
         };
         let arrayNumber: number = 0;
-        const addTagLabel = (id: string, name: string, e: KeyboardEvent): void => {
+        const addTagLabel = (id: string, name: string, e?: KeyboardEvent, delHide: boolean = false): void => {
           if ( selected_label?.querySelector(`span.label[data-id="${id}"]`) ) return;
 
           const labelBtn = document.createElement('span');
@@ -494,12 +498,26 @@ export const CleePIX: {
           delButton.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
           delButton.ariaLabel = '削除';
           delButton.addEventListener('click', () => { labelBtn.remove() });
-
-          (<HTMLInputElement> e.target).value = '';
-          setTimeout(() => {(<HTMLInputElement> e.target).focus();}, 300);
           labelBtn.appendChild( delButton );
+
+          if ( delHide ) {
+            delButton.hidden = true;
+          }
+
+          if ( e ) {
+            (<HTMLInputElement> e.target).value = '';
+            setTimeout(() => {(<HTMLInputElement> e.target).focus();}, 300);
+          }
+
           selected_label?.append(labelBtn);
         };
+
+        selected_label!.addEventListener('tag-insert', (e) => {
+          selected_label!.innerHTML = '';
+          e.detail.forEach(tag => {
+            addTagLabel( `${ tag.id }`, tag.name, undefined, true );
+          });
+        });
 
         let tabKeyCansel: boolean = false;
         target.liveDom.querySelector<HTMLDivElement>('input.tag_input')
@@ -1248,6 +1266,9 @@ export const CleePIX: {
 
       titleText.addEventListener('input', (e) => { textareaResizer( <HTMLTextAreaElement>e.target! ) }, false);
 
+      CleePIX.liveDom.contentsPanel.base
+        .querySelector<HTMLSpanElement>('div.page-details-content span.tag_input_wrap')!.hidden = true;
+
       CleePIX.shareParts.toggleLoadingEfect( true );
       window.electron.ipcRenderer
         .invoke('get-bookmarks', { instanceId: CleePIX.currentInstanceId, tagIdChain: null })
@@ -1273,14 +1294,20 @@ export const CleePIX: {
       const titleText = pageDetails.querySelector<HTMLTextAreaElement>('#bk-dts-title')!;
       const url = pageDetails.querySelector<HTMLInputElement>('#bk-dts-url')!;
       const dsc = pageDetails.querySelector<HTMLTextAreaElement>('#bk-dts-dsc')!;
+      const tagLabels = pageDetails.querySelector<HTMLSpanElement>('span.selected-label')!;
       insertCe.innerHTML = "";
 
       bookmarks.forEach(( bookmark ) => {
         const bookmarkItem = includeDom.contentsPanel.bookmarkItem();
         const hoverForMouse = bookmarkItem.querySelector<HTMLDivElement>('div.hover-for-mouse')!;
         const thumbnail = bookmarkItem.querySelector<HTMLDivElement>('div.thumbnail')!;
-        const link = bookmarkItem.querySelector<HTMLLinkElement>('a.link')!;
+        const link = bookmarkItem.querySelector<HTMLSpanElement>('span.link')!;
         const description = bookmarkItem.querySelector<HTMLParagraphElement>('p.description')!;
+
+        bookmarkItem.querySelector<HTMLButtonElement>('button.float.open-link')!
+          .addEventListener('click', () => {
+            window.open( bookmark.url, '_blank' );
+          });
 
         if ( bookmark.thunb ) {
           const image = document.createElement('img');
@@ -1294,7 +1321,6 @@ export const CleePIX: {
           thumbnail.appendChild( span );
         }
 
-        link.href = bookmark.url;
         link.textContent = bookmark.title;
 
         let descriptionString: string = '';
@@ -1334,6 +1360,14 @@ export const CleePIX: {
 
           dsc.value = bookmark.description;
           setTimeout(() => { textareaResizer( dsc ) }, 300);
+
+          window.electron.ipcRenderer.invoke('get-tags-in-bookmark', {
+            instanceId: CleePIX.currentInstanceId, bookmarkId: bookmark.id
+          }).then((tags) => {
+            if ( tags ) {
+              tagLabels.dispatchEvent( new CustomEvent('tag-insert', { detail: tags }) );
+            }
+          });
 
           webviewWrap.dataset.url = bookmark.url;
           webviewWrap.dataset.isLoaded = 'false';

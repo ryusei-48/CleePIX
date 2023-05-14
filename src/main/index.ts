@@ -165,6 +165,10 @@ const CleePIX: {
       } catch (e) { console.log(e); return false }
     });
 
+    ipcMain.handle('remove-bookmark', (_, bk) => {
+      //
+    });
+
     ipcMain.on('window-close', () => {
       Object.values(this.storage).forEach(value => {
         value.db?.close();
@@ -335,6 +339,16 @@ const CleePIX: {
           return true;
         } else return false;
       } catch (e) { console.log(e); return false; }
+    });
+
+    ipcMain.handle('get-tags-in-bookmark', (_, bk) => {
+      try {
+        return this.storage[ bk.instanceId ].db?.prepare(
+          `SELECT tags.* FROM tags
+            JOIN tags_bookmarks AS tbt ON tags.id = tbt.tags_id
+            WHERE tbt.bookmark_id = ?`
+          ).all( bk.bookmarkId );
+      }catch (e) { console.log(e); return null }
     });
 
     ipcMain.handle('get-site-metadata', async (_, url) => {

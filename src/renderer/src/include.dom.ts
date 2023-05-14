@@ -286,6 +286,10 @@ export const includeDom: {
                     <div class="label"><label for="bk-dts-dsc">説明</label></div>
                     <div class="input"><textarea id="bk-dts-dsc" rows="1" readonly></textarea></div>
                   </div>
+                  <div class="item-block">
+                    <div class="label"><label for="bk-dts-tags">タグ</label></div>
+                    <div class="form tags input"></div>
+                  </div>
                 </fieldset>
               </div>
               <div inert class="content browse animate__animated animate__fadeOut">
@@ -312,7 +316,7 @@ export const includeDom: {
           <button class="float delete" title="削除"><i class="fa-regular fa-trash-can"></i></button>
           <div class="hover-for-mouse">
             <div class="thumbnail"></div>
-            <a class="link" href="#" target="_blank"></a>
+            <span class="link"></span>
             <p class="description"></p>
           </div>
         </div>

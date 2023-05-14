@@ -511,9 +511,6 @@ main {
             //min-height: 100%;
             .bookmark-item {
               padding: 5px;
-              a.link-wrap {
-                display: block;
-              }
               div.content {
                 position: relative;
                 width: 100%;
@@ -573,7 +570,7 @@ main {
                   }
                 }
               }
-              a {
+              span.link {
                 display: block;
                 margin-top: 5px;
                 padding: 4px;
@@ -662,6 +659,8 @@ main {
                         width: 100%;
                         font-size: 13pt;
                         padding: 5px;
+                        background-color: #24232398;
+                        backdrop-filter: blur(10px);
                       }
                       > textarea {
                         width: 100%;
@@ -670,7 +669,67 @@ main {
                         padding: 5px;
                         line-height: 1.5em;
                         font-weight: bold;
+                        background-color: #24232398;
+                        backdrop-filter: blur(10px);
                         //transition: height .3s ease-in-out;
+                      }
+                    }
+                    div.form.input.tags {
+                      padding: 7px;
+                      .tags_blocks_wrap {
+                        display: block;
+                        width: 100%;
+                        padding: 7px;
+                        background-color: #24232398;
+                        backdrop-filter: blur(10px);
+                        text-align: left;
+                        span.selected-label > span {
+                          display: inline-block;
+                          font-size: 10pt;
+                          margin-top: 4px;
+                          margin-bottom: 4px;
+                          margin-right: 5px;
+                          padding: 4px 6px;
+                          background-color: #6f3f00;
+                          border-radius: 10px;
+                          cursor: default;
+                          > button {
+                            margin-left: 5px;
+                          }
+                        }
+                        span.tag_input_wrap {
+                          position: relative;
+                          min-width: 50px;
+                          input[type="text"].tag_input {
+                            display: inline !important;
+                            width: unset !important;
+                            min-width: 50px;
+                            border-bottom: unset !important;
+                            &:focus {
+                              border-bottom: unset !important;
+                            }
+                          }
+                          span.tag_suggest {
+                            position: absolute;
+                            width: 100%;
+                            top: 100%;
+                            left: 0;
+                            opacity: 0;
+                            background-color: rgb(38, 38, 38);
+                            button {
+                              display: block;
+                              width: 100%;
+                              padding: 4px 8px;
+                              border-bottom: 1px solid #484848;
+                              &:hover {
+                                background-color: #555555;
+                              }
+                            }
+                          }
+                        }
+                        span.tag_blocks {
+                          display: inline !important;
+                        }
                       }
                     }
                   }
@@ -703,6 +762,7 @@ main {
     }
   }
 }
+
 
 // ポップアップパーツ
 .app-setings-modal-wrap,

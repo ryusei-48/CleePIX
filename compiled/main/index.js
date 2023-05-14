@@ -333,6 +333,18 @@ const CleePIX = {
         return false;
       }
     });
+    electron.ipcMain.handle("get-tags-in-bookmark", (_, bk) => {
+      try {
+        return this.storage[bk.instanceId].db?.prepare(
+          `SELECT tags.* FROM tags
+            JOIN tags_bookmarks AS tbt ON tags.id = tbt.tags_id
+            WHERE tbt.bookmark_id = ?`
+        ).all(bk.bookmarkId);
+      } catch (e) {
+        console.log(e);
+        return null;
+      }
+    });
     electron.ipcMain.handle("get-site-metadata", async (_, url) => {
       return await this.shareParts.getWebpageMetadata(url);
     });
