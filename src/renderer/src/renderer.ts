@@ -99,15 +99,9 @@ export const CleePIX: {
         window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId)
           .then((result) => { console.log(result) });
       }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyD' ) {
-        window.electron.ipcRenderer.invoke('get-dom-screenshot', 'https://gigazine.net')
+        window.electron.ipcRenderer.invoke('get-rss-feed', 'https://forest.watch.impress.co.jp/')
           .then((res) => {
-            const insertImage = this.liveDom.addAppSeting
-                .querySelector<HTMLSpanElement>('span#test-img')!;
-            const img = document.createElement('img');
-            img.style.width = '400px';
-            img.style.aspectRatio = '16 / 9';
-            img.src = window.URL.createObjectURL( new Blob([res], { type: 'image/png' }) );
-            insertImage.appendChild( img );
+            console.log(res);
           });
       }else if ( e.ctrlKey && e.altKey && e.code === 'KeyD' ) {
         window.electron.ipcRenderer.send('open-dev-tool');
@@ -435,7 +429,7 @@ export const CleePIX: {
 
       this.commonModalWindow(
         '#show-rss-feed-modal-btn', CleePIX.liveDom.addRssFeed,
-        '.add-rss-feed-modal-wrap', '#add-rss-feed-btn'
+        '.add-rss-feed-modal-wrap', '#add-rss-feed-url'
       );
 
       CleePIX.liveDom.instancePanel.insertAdjacentElement('afterend', CleePIX.liveDom.addRssFeed);
@@ -1307,6 +1301,20 @@ export const CleePIX: {
         bookmarkItem.querySelector<HTMLButtonElement>('button.float.open-link')!
           .addEventListener('click', () => {
             window.open( bookmark.url, '_blank' );
+          });
+
+        bookmarkItem.querySelector<HTMLButtonElement>('button.float.delete')!
+          .addEventListener('click', () => {
+            if ( confirm('このブックマークを削除してもよろしいですか？') ) {
+              window.electron.ipcRenderer.invoke('remove-bookmark', {
+                instanceId: CleePIX.currentInstanceId, bookmarkId: bookmark.id
+              }).then((result) => {
+                if ( result ) {
+                  bookmarkItem.classList.replace('animate__fadeIn', 'animate__fadeOut');
+                  setTimeout(() => { bookmarkItem.remove() }, 500);
+                }
+              });
+            }
           });
 
         if ( bookmark.thunb ) {

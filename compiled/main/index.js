@@ -31,6 +31,7 @@ const cheerio = require("cheerio");
 const axios = require("axios");
 const fileTypeCjsFix = require("file-type-cjs-fix");
 const bookmarkFileParser = require("bookmark-file-parser");
+const RssFeedParser = require("rss-parser");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -60,7 +61,6 @@ const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
 const CleePIX = {
   Windows: { forScraping: null, forScreenshot: null },
   storage: {},
-  configTemp: {},
   config: new Store(
     /*{ encryptionKey: 'ymzkrk33' }*/
   ),
@@ -167,6 +167,25 @@ const CleePIX = {
       } catch (e) {
         console.log(e);
         return false;
+      }
+    });
+    electron.ipcMain.handle("remove-bookmark", (_, bk) => {
+      try {
+        return this.storage[bk.instanceId].db?.prepare(
+          `DELETE FROM bookmarks WHERE id = ?`
+        ).run(bk.bookmarkId);
+      } catch (e) {
+        console.log(e);
+        return null;
+      }
+    });
+    electron.ipcMain.handle("get-rss-feed", async (_, url) => {
+      const parser = new RssFeedParser();
+      try {
+        const feed = await parser.parseURL(url);
+        return feed;
+      } catch (e) {
+        return null;
       }
     });
     electron.ipcMain.on("window-close", () => {
@@ -557,6 +576,15 @@ const CleePIX = {
           PRIMARY KEY("parent_id", "child_id")
         )`
       ).run();
+      this.storage[storage.id].db.prepare(
+        `CREATE TABLE "rss_sources" (
+          "id" INTEGER UNIQUE, "site_name" TEXT NOT NULL, "url" TEXT NOT NULL,
+          "feed_url" TEXT NOT NULL, "thumb" BLOB, "thumb_mime" TEXT,
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
+      ).run();
       this.storage[storage.id].db?.prepare(
         `CREATE INDEX bookmarks_index
           ON bookmarks( id, title, description, url, data, memo, update_time, register_time )`
@@ -564,50 +592,7 @@ const CleePIX = {
       this.storage[storage.id].db?.prepare(`CREATE INDEX tags_index ON tags( id, name, update_time, register_time )`).run();
       this.storage[storage.id].db?.prepare(`CREATE INDEX tb_index ON tags_bookmarks( tags_id, bookmark_id )`).run();
       this.storage[storage.id].db?.prepare(`CREATE INDEX ts_index ON tags_structure( parent_id, child_id )`).run();
-      [
-        "プログラミング",
-        "プログラミング言語",
-        "プロミス",
-        "プロパンガス",
-        "engineer",
-        "エンジニア",
-        "Programming",
-        "promise",
-        "glass",
-        "グラス",
-        "Python",
-        "C/C++",
-        "JavaScript",
-        "TypeScript",
-        "PHP",
-        "HTML",
-        "SCSS",
-        "Rust",
-        "フリーランス",
-        "フルスタック",
-        "インフラ",
-        "フロントエンド",
-        "サーバーサイド"
-      ].forEach((word) => {
-        this.storage[storage.id].db.prepare(
-          `INSERT INTO tags (name) VALUES ( ? )`
-        ).run(word);
-      });
-      for (let i = 1; i <= 10; i++) {
-        this.storage[storage.id].db.prepare(
-          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run(0, i);
-      }
-      for (let i = 11; i <= 18; i++) {
-        this.storage[storage.id].db.prepare(
-          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run(2, i);
-      }
-      for (let i = 19; i <= 23; i++) {
-        this.storage[storage.id].db.prepare(
-          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run(6, i);
-      }
+      this.storage[storage.id].db?.prepare(`CREATE INDEX rs_index ON rss_sources( id, site_name, url, feed_url, register_time, update_time )`);
     };
     if (!fs.existsSync(USER_DATA_PATH + "/storage")) {
       fs.mkdirSync(USER_DATA_PATH + "/storage");

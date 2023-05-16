@@ -1,6 +1,6 @@
 import {app, shell, BrowserWindow, ipcMain, nativeTheme} from 'electron';
 import Store from 'electron-store';
-import { join } from 'path'
+import { join, parse } from 'path'
 import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
@@ -11,6 +11,7 @@ import * as cheerio from "cheerio";
 import axios from "axios";
 import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
+import RssFeedParser from "rss-parser";
 
 export type storeConfig = {
   window: {
@@ -34,7 +35,7 @@ const CleePIX: {
     forScreenshot: BrowserWindow | null
   },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
-  config: Store<storeConfig>, configTemp: storeConfig,
+  config: Store<storeConfig>, configTemp?: storeConfig,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
   createWindowInstance: () => BrowserWindow,
   shareParts: {
@@ -48,7 +49,7 @@ const CleePIX: {
 
 } = {
 
-  Windows: { forScraping: null, forScreenshot: null }, storage: {}, configTemp: {},
+  Windows: { forScraping: null, forScreenshot: null }, storage: {},
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
   run: function () {
@@ -166,7 +167,19 @@ const CleePIX: {
     });
 
     ipcMain.handle('remove-bookmark', (_, bk) => {
-      //
+      try {
+        return this.storage[ bk.instanceId ].db?.prepare(
+          `DELETE FROM bookmarks WHERE id = ?`
+        ).run( bk.bookmarkId );
+      }catch (e) { console.log(e); return null }
+    });
+
+    ipcMain.handle('get-rss-feed', async (_, url) => {
+      const parser = new RssFeedParser();
+      try {
+        const feed = await parser.parseURL( url );
+        return feed;
+      } catch (e) { return null }
     });
 
     ipcMain.on('window-close', () => {
@@ -198,34 +211,34 @@ const CleePIX: {
     ipcMain.on('ite-name-update', (_, ite) => {
       this.config.store.instance!.forEach((i, index) => {
         if (i.id == ite.id) {
-          this.configTemp.instance![index].label = ite.name;
+          this.configTemp!.instance![index].label = ite.name;
           this.config.store = this.configTemp!; return;
         }
       });
     });
 
     ipcMain.on('set-ite-id-cache', (_, id) => {
-      this.configTemp.cache!.currentInstanceId = id;
-      this.config.set('cache', this.configTemp.cache);
+      this.configTemp!.cache!.currentInstanceId = id;
+      this.config.set('cache', this.configTemp!.cache);
     });
 
     ipcMain.handle('set-tag-tree-cache', (_, cache) => {
-      this.configTemp.cache!.tagTreeDomStrings = cache ? cache.tagTreeCache : null;
-      this.configTemp.cache!.selectedTags = cache ? cache.selectedTags : null;
-      this.config.set('cache', this.configTemp.cache);
+      this.configTemp!.cache!.tagTreeDomStrings = cache ? cache.tagTreeCache : null;
+      this.configTemp!.cache!.selectedTags = cache ? cache.selectedTags : null;
+      this.config.set('cache', this.configTemp!.cache);
     });
 
     ipcMain.handle('add-instance', () => {
-      this.configTemp.instance = this.configTemp.instance?.sort((a, b) => {
+      this.configTemp!.instance = this.configTemp!.instance?.sort((a, b) => {
         return (a.id < b.id) ? -1 : 1;
       });
 
-      const newId: number = this.configTemp.instance!.slice(-1)[0].id + 1;
+      const newId: number = this.configTemp!.instance!.slice(-1)[0].id + 1;
       const newInstance = { label: 'new instance', id: newId, path: STORAGE_PATH + `/ite_${randomString()}.db` };
-      this.configTemp.instance?.push(newInstance);
+      this.configTemp!.instance?.push(newInstance);
       this.initializeDB(newInstance);
-      //this.config.store = this.configTemp;
-      this.config.set('instance', this.configTemp.instance);
+      //this.config.store = this.configTemp!.
+      this.config.set('instance', this.configTemp!.instance);
 
       return newInstance;
     });
@@ -234,7 +247,7 @@ const CleePIX: {
       let instancePath: string = '';
       let instanceId: number = 0;
       let indexTemp: number = 0;
-      this.configTemp.instance?.forEach((ite, index) => {
+      this.configTemp!.instance?.forEach((ite, index) => {
         if (ite.id === id) {
           indexTemp = index;
           instanceId = ite.id;
@@ -246,8 +259,8 @@ const CleePIX: {
       fs.unlink(instancePath, (e) => {
         if (e === null) {
           delete this.storage[instanceId];
-          this.configTemp.instance?.splice(indexTemp, 1);
-          this.config.set( 'instance', this.configTemp.instance );
+          this.configTemp!.instance?.splice(indexTemp, 1);
+          this.config.set( 'instance', this.configTemp!.instance );
         }
       });
     });
@@ -534,6 +547,7 @@ const CleePIX: {
       //this.storage.main.db.pragma(`cipher='aes256cbc'`);
       //this.storage.main.pragma("key='ymzkrk33'");
       this.storage[storage.id].db?.pragma('journal_mode = WAL');
+
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "bookmarks" (
           "id" INTEGER NOT NULL UNIQUE, "url" TEXT NOT NULL,
@@ -545,6 +559,7 @@ const CleePIX: {
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
+
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags" (
           "id"	INTEGER UNIQUE, "name"  TEXT NOT NULL UNIQUE,
@@ -555,6 +570,7 @@ const CleePIX: {
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
+
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags_bookmarks" (
           "tags_id"	INTEGER NOT NULL, "bookmark_id"	INTEGER NOT NULL,
@@ -563,11 +579,22 @@ const CleePIX: {
           PRIMARY KEY("tags_id","bookmark_id")
         )`
       ).run();
+
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "tags_structure" (
           "parent_id"	INTEGER NOT NULL, "child_id"	INTEGER NOT NULL,
           FOREIGN KEY("child_id") REFERENCES "tags"("id") ON DELETE CASCADE,
           PRIMARY KEY("parent_id", "child_id")
+        )`
+      ).run();
+
+      this.storage[storage.id].db!.prepare(
+        `CREATE TABLE "rss_sources" (
+          "id" INTEGER UNIQUE, "site_name" TEXT NOT NULL, "url" TEXT NOT NULL,
+          "feed_url" TEXT NOT NULL, "thumb" BLOB, "thumb_mime" TEXT,
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
 
@@ -581,35 +608,8 @@ const CleePIX: {
         ?.prepare(`CREATE INDEX tb_index ON tags_bookmarks( tags_id, bookmark_id )`).run();
       this.storage[storage.id].db
         ?.prepare(`CREATE INDEX ts_index ON tags_structure( parent_id, child_id )`).run();
-
-      [
-        'プログラミング', 'プログラミング言語', 'プロミス', 'プロパンガス',
-        'engineer', 'エンジニア', 'Programming', 'promise', 'glass', 'グラス',
-        'Python', 'C/C++', 'JavaScript', 'TypeScript', 'PHP', 'HTML', 'SCSS', 'Rust',
-        'フリーランス', 'フルスタック', 'インフラ', 'フロントエンド', 'サーバーサイド'
-      ].forEach(word => {
-        this.storage[storage.id].db!.prepare(
-          `INSERT INTO tags (name) VALUES ( ? )`
-        ).run(word);
-      });
-
-      for (let i = 1; i <= 10; i++) {
-        this.storage[storage.id].db!.prepare(
-          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run(0, i);
-      }
-
-      for (let i = 11; i <= 18; i++) {
-        this.storage[storage.id].db!.prepare(
-          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run(2, i);
-      }
-
-      for (let i = 19; i <= 23; i++) {
-        this.storage[storage.id].db!.prepare(
-          `INSERT INTO tags_structure ( parent_id, child_id ) VALUES ( ?, ? )`
-        ).run(6, i);
-      }
+      this.storage[storage.id].db
+        ?.prepare(`CREATE INDEX rs_index ON rss_sources( id, site_name, url, feed_url, register_time, update_time )`);
     }
 
     if ( !fs.existsSync(USER_DATA_PATH + '/storage') ) {
@@ -626,7 +626,7 @@ const CleePIX: {
 
   createWindowInstance: function () {
 
-    const windowConfig = this.configTemp.window.main;
+    const windowConfig = this.configTemp!.window.main;
 
     const window = new BrowserWindow({
       width: 1360, minWidth: 1100, x: windowConfig.x ? windowConfig.x : undefined,
@@ -641,7 +641,7 @@ const CleePIX: {
       }
     });
 
-    if ( this.configTemp.window.main.isMaximize ) window.maximize();
+    if ( this.configTemp!.window.main.isMaximize ) window.maximize();
 
     window.on('ready-to-show', () => {
       window.show()
@@ -649,19 +649,19 @@ const CleePIX: {
 
     window.on('moved', () => {
       const rect = window.getNormalBounds();
-      this.configTemp.window.main.x = rect.x;
-      this.configTemp.window.main.y = rect.y;
-      this.config.set('window', this.configTemp.window);
+      this.configTemp!.window.main.x = rect.x;
+      this.configTemp!.window.main.y = rect.y;
+      this.config.set('window', this.configTemp!.window);
     });
 
     window.on('maximize', () => {
-      this.configTemp.window.main.isMaximize = true;
-      this.config.set('window', this.configTemp.window);
+      this.configTemp!.window.main.isMaximize = true;
+      this.config.set('window', this.configTemp!.window);
     });
 
     window.on('unmaximize', () => {
-      this.configTemp.window.main.isMaximize = false;
-      this.config.set('window', this.configTemp.window);
+      this.configTemp!.window.main.isMaximize = false;
+      this.config.set('window', this.configTemp!.window);
     });
 
     window.webContents.setWindowOpenHandler((details) => {

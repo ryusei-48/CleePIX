@@ -70,11 +70,12 @@ export const includeDom: {
           <input type="search" placeholder="検索キーワード" id="search-text">
           <button id="send-search-query" aria-label="検索"><i class="fa-solid fa-magnifying-glass"></i></button>
         </div>
-        <div class="filter-parts">
-          <button id="change-bookmark-btn" title="ブックマークフィルター" aria-label="フィルター、ブックマーク"><i class="fa-solid fa-bookmark"></i></button>
-          <button id="change-rss-btn" title="RSSフィードフィルター" aria-label="フィルター、RSSフィード"><i class="fa-solid fa-rss"></i></button>
-          <button id="change-text-btn" title="定型文フィルター" aria-label="フィルター、定型文"><i class="fa-solid fa-file"></i></button>
-          <button id="change-design" title="デザイン切り替え" aria-label="デザイン切り替え"><i class="fa-solid fa-table-cells-large"></i></button>
+        <div class="external-window-toggles">
+          <button id="open-feed-reader-btn" aria-label="フィードリーダーを開く"><i class="fa-solid fa-rss"></i> フィードリーダー</button>
+          <button id="open-clip-manage-btn" aria-label="クリップボードマネージャー"><i class="fa-solid fa-clipboard"></i> クリップボード</button>
+        </div>
+        <div class="design-change">
+          <button id="change-design-btn" title="デザイン切り替え" aria-label="デザイン切り替え"><i class="fa-solid fa-table-cells-large"></i></button>
         </div>
       </div>
       <div class="tag-and-content-wrap">
@@ -209,10 +210,10 @@ export const includeDom: {
           <h2>RSSフィードを追加</h2>
           <fieldset class="forms">
             <legend>RSSフィードを追加するための入力フィールド</legend>
-            <div class="label"><label for="add-rss-feed-title">サイトタイトル</label></div>
-            <div class="form"><input type="text" id="add-rss-feed-title"></div>
             <div class="label"><label for="add-rss-feed-url">フィードURL</label></div>
             <div class="form"><input type="url" id="add-rss-feed-url"></div>
+            <div class="label"><label for="add-rss-feed-title">サイトタイトル</label></div>
+            <div class="form"><input type="text" id="add-rss-feed-title"></div>
             <div class="label"><label for="add-rss-feed-thumb">サイトアイコン</label></div>
             <div class="form"><input type="file" id="add-rss-feed-thumb"></div>
             <div class="label"><label for="add-rss-tags">タグ</label></div>
