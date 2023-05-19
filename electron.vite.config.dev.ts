@@ -12,7 +12,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, './src/main/index.ts'),
-          import_bookmarks: resolve(__dirname, './src/main/thread-scripts/import-bookmarks.ts')
+          import_bookmarks: resolve(__dirname, './src/main/thread-scripts/import-bookmarks.ts'),
+          get_bookmarks: resolve(__dirname, './src/main/thread-scripts/get-bookmarks.ts')
         }
       },
       //minify: true,

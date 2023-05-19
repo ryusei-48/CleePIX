@@ -1,10 +1,11 @@
-import {app, shell, BrowserWindow, ipcMain, nativeTheme} from 'electron';
+import { app, shell, BrowserWindow, ipcMain, NativeImage, nativeTheme, Menu, Tray, nativeImage } from 'electron';
 import Store from 'electron-store';
 import { join, parse } from 'path'
 import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
+import appIcon from './logo.png?asset';
 import importBookmarksWorker from "./thread-scripts/import-bookmarks?nodeWorker";
 import getBookmarksWorker from './thread-scripts/get-bookmarks?nodeWorker';
 import * as cheerio from "cheerio";
@@ -15,7 +16,9 @@ import RssFeedParser from "rss-parser";
 
 export type storeConfig = {
   window: {
-    main: { x: number | null, y: number | null, isMaximize: boolean }
+    main: { x: number | null, y: number | null, isMaximize: boolean },
+    feedReader: { x: number | null, y: number | null, isMaximize: boolean },
+    clipboard: { x: number | null, y: number | null, isMaximize: boolean }
   },
   instance?: { label: string, id: number, path: string }[],
   cache?: {
@@ -32,12 +35,13 @@ const CleePIX: {
 
   Windows: {
     main?: BrowserWindow, forScraping: BrowserWindow | null,
-    forScreenshot: BrowserWindow | null
+    forScreenshot: BrowserWindow | null,
+    feedReader: BrowserWindow | null, clipboard: BrowserWindow | null
   },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
   config: Store<storeConfig>, configTemp?: storeConfig,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
-  createWindowInstance: () => BrowserWindow,
+  createWindowInstance: ( mode: 'main' | 'feedreader' | 'clipboard' ) => BrowserWindow,
   shareParts: {
     getInstanceDatabasePath: ( instanceId: number ) => string | null,
     getWebpageMetadata: ( url: string, isStatic?: boolean ) => Promise<{
@@ -49,7 +53,9 @@ const CleePIX: {
 
 } = {
 
-  Windows: { forScraping: null, forScreenshot: null }, storage: {},
+  Windows: {
+    forScraping: null, forScreenshot: null, feedReader: null, clipboad: null,
+  }, storage: {},
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
   run: function () {
@@ -58,7 +64,9 @@ const CleePIX: {
     if (this.config.size === 0) {
       this.config.store = {
         window: {
-          main: { x: null, y: null, isMaximize: false }
+          main: { x: null, y: null, isMaximize: false },
+          feedReader: { x: null, y: null, isMaximize: false },
+          clipboad: { x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: 'default', id: 1,
@@ -79,17 +87,6 @@ const CleePIX: {
 
     this.config.store.instance!.forEach(db => {
       this.initializeDB(db);
-    });
-
-    app.whenReady().then(async () => {
-
-      this.Windows.main = this.createWindowInstance();
-
-      app.on('activate', () => {
-        // On macOS it's common to re-create a window in the app when the
-        // dock icon is clicked and there are no other windows open.
-        if (BrowserWindow.getAllWindows().length === 0) CleePIX.createWindowInstance();
-      });
     });
 
     this.config.onDidAnyChange(() => {
@@ -197,15 +194,6 @@ const CleePIX: {
 
     ipcMain.on('window-minize', () => {
       this.Windows.main?.minimize();
-    });
-
-    // Quit when all windows are closed, except on macOS. There, it's common
-    // for applications and their menu bar to stay active until the user quits
-    // explicitly with Cmd + Q.
-    app.on('window-all-closed', () => {
-      if (process.platform !== 'darwin') {
-        app.quit()
-      }
     });
 
     ipcMain.on('ite-name-update', (_, ite) => {
@@ -396,6 +384,48 @@ const CleePIX: {
     ipcMain.on('open-dev-tool', () => {
       this.Windows.main?.webContents.openDevTools();
     });
+
+    ipcMain.on('window-hide', (_, windowName) => {
+      this.Windows.main?.hide();
+    });
+
+    app.whenReady().then( () => {
+
+      this.Windows.main = this.createWindowInstance('main');
+
+      const tray = new Tray(nativeImage.createFromPath( appIcon ));
+      const contextMenu = Menu.buildFromTemplate([
+        { label: 'アプリを表示', type: 'normal' },
+        { label: 'フィードリーダー', type: 'normal' },
+        { label: 'クリップボード', type: 'normal' },
+        { label: '設定', type: 'normal' },
+        { label: '終了', type: 'normal', role: 'quit' }
+      ]);
+      tray.setToolTip('CleePIX');
+      tray.setContextMenu(contextMenu);
+      tray.on('click', () => {
+        if ( !this.Windows.main?.isVisible() ) {
+          this.Windows.main?.show(); 
+        }
+        //console.log(this.Windows.main?.isVisible());
+        //this.Windows.main?.show();
+      });
+
+      app.on('activate', () => {
+        // On macOS it's common to re-create a window in the app when the
+        // dock icon is clicked and there are no other windows open.
+        if (BrowserWindow.getAllWindows().length === 0) CleePIX.createWindowInstance();
+      });
+    });
+
+    // Quit when all windows are closed, except on macOS. There, it's common
+    // for applications and their menu bar to stay active until the user quits
+    // explicitly with Cmd + Q.
+    app.on('window-all-closed', () => {
+      if (process.platform !== 'darwin') {
+        app.quit()
+      }
+    });
   },
 
   shareParts: {
@@ -441,9 +471,9 @@ const CleePIX: {
               backgroundColor: "#0f0f0f",
             });
           }
-  
+
           CleePIX.Windows.forScraping.webContents.audioMuted = true;
-  
+
           try {
             if ( url.match(/^(https|http):\/\/.*/) ) {
               await CleePIX.Windows.forScraping.loadURL( url )
@@ -624,9 +654,9 @@ const CleePIX: {
 
   },
 
-  createWindowInstance: function () {
+  createWindowInstance: function ( mode ) {
 
-    const windowConfig = this.configTemp!.window.main;
+    const windowConfig = this.configTemp!.window[ mode ];
 
     const window = new BrowserWindow({
       width: 1360, minWidth: 1100, x: windowConfig.x ? windowConfig.x : undefined,
@@ -641,26 +671,26 @@ const CleePIX: {
       }
     });
 
-    if ( this.configTemp!.window.main.isMaximize ) window.maximize();
+    if ( mode === 'main' && this.configTemp?.window.main.isMaximize ) window.maximize();
 
     window.on('ready-to-show', () => {
-      window.show()
+      window.show();
     });
 
     window.on('moved', () => {
       const rect = window.getNormalBounds();
-      this.configTemp!.window.main.x = rect.x;
-      this.configTemp!.window.main.y = rect.y;
+      this.configTemp!.window[ mode ].x = rect.x;
+      this.configTemp!.window[ mode ].y = rect.y;
       this.config.set('window', this.configTemp!.window);
     });
 
     window.on('maximize', () => {
-      this.configTemp!.window.main.isMaximize = true;
+      this.configTemp!.window[ mode ].isMaximize = true;
       this.config.set('window', this.configTemp!.window);
     });
 
     window.on('unmaximize', () => {
-      this.configTemp!.window.main.isMaximize = false;
+      this.configTemp!.window[ mode ].isMaximize = false;
       this.config.set('window', this.configTemp!.window);
     });
 

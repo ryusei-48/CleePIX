@@ -31,9 +31,10 @@ export const includeDom: {
           <h1>cleepix</h1>
         </div>
         <div class="app-setings"><button id="app-setings" aria-label="設定"><i class="fa-solid fa-gear"></i> 設定</button></div>
+        <div id="hide-win"><button title="ウィンドウを隠す" aria-label="ウィンドウを隠す"><i class="fa-regular fa-eye-slash"></i></button></div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
         <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
-        <div id="close-win"><button aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button></div>
+        <div id="close-win"><button aria-label="アプリ終了"><i class="fa-solid fa-xmark"></i></button></div>
       </header>
       <main id="insert-panel" class="animate__animated animate__fadeIn"></main>
       <div class="tmp-doms">

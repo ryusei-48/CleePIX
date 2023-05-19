@@ -50,16 +50,22 @@ function _interopNamespaceDefault(e) {
 }
 const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
 const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
+const appIcon = path.join(__dirname, "./chunks/logo-5802e1fb.png");
 function importBookmarksWorker(options) {
   return new node_worker_threads.Worker(require.resolve("./import_bookmarks.js"), options);
 }
 function getBookmarksWorker(options) {
-  return new node_worker_threads.Worker(require.resolve("./chunks/get-bookmarks-fb5e491d.js"), options);
+  return new node_worker_threads.Worker(require.resolve("./get_bookmarks.js"), options);
 }
 const USER_DATA_PATH = electron.app.getPath("userData");
 const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
 const CleePIX = {
-  Windows: { forScraping: null, forScreenshot: null },
+  Windows: {
+    forScraping: null,
+    forScreenshot: null,
+    feedReader: null,
+    clipboad: null
+  },
   storage: {},
   config: new Store(
     /*{ encryptionKey: 'ymzkrk33' }*/
@@ -68,7 +74,9 @@ const CleePIX = {
     if (this.config.size === 0) {
       this.config.store = {
         window: {
-          main: { x: null, y: null, isMaximize: false }
+          main: { x: null, y: null, isMaximize: false },
+          feedReader: { x: null, y: null, isMaximize: false },
+          clipboad: { x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: "default",
@@ -90,13 +98,6 @@ const CleePIX = {
     this.configTemp = this.config.store;
     this.config.store.instance.forEach((db) => {
       this.initializeDB(db);
-    });
-    electron.app.whenReady().then(async () => {
-      this.Windows.main = this.createWindowInstance();
-      electron.app.on("activate", () => {
-        if (electron.BrowserWindow.getAllWindows().length === 0)
-          CleePIX.createWindowInstance();
-      });
     });
     this.config.onDidAnyChange(() => {
       this.Windows.main?.webContents.send("config-update", this.config.store);
@@ -202,11 +203,6 @@ const CleePIX = {
     });
     electron.ipcMain.on("window-minize", () => {
       this.Windows.main?.minimize();
-    });
-    electron.app.on("window-all-closed", () => {
-      if (process.platform !== "darwin") {
-        electron.app.quit();
-      }
     });
     electron.ipcMain.on("ite-name-update", (_, ite) => {
       this.config.store.instance.forEach((i, index) => {
@@ -391,6 +387,36 @@ const CleePIX = {
     });
     electron.ipcMain.on("open-dev-tool", () => {
       this.Windows.main?.webContents.openDevTools();
+    });
+    electron.ipcMain.on("window-hide", (_, windowName) => {
+      this.Windows.main?.hide();
+    });
+    electron.app.whenReady().then(() => {
+      this.Windows.main = this.createWindowInstance("main");
+      const tray = new electron.Tray(electron.nativeImage.createFromPath(appIcon));
+      const contextMenu = electron.Menu.buildFromTemplate([
+        { label: "アプリを表示", type: "normal" },
+        { label: "フィードリーダー", type: "normal" },
+        { label: "クリップボード", type: "normal" },
+        { label: "設定", type: "normal" },
+        { label: "終了", type: "normal", role: "quit" }
+      ]);
+      tray.setToolTip("CleePIX");
+      tray.setContextMenu(contextMenu);
+      tray.on("click", () => {
+        if (!this.Windows.main?.isVisible()) {
+          this.Windows.main?.show();
+        }
+      });
+      electron.app.on("activate", () => {
+        if (electron.BrowserWindow.getAllWindows().length === 0)
+          CleePIX.createWindowInstance();
+      });
+    });
+    electron.app.on("window-all-closed", () => {
+      if (process.platform !== "darwin") {
+        electron.app.quit();
+      }
     });
   },
   shareParts: {
@@ -606,8 +632,8 @@ const CleePIX = {
     } else
       initDB();
   },
-  createWindowInstance: function() {
-    const windowConfig = this.configTemp.window.main;
+  createWindowInstance: function(mode) {
+    const windowConfig = this.configTemp.window[mode];
     const window = new electron.BrowserWindow({
       width: 1360,
       minWidth: 1100,
@@ -626,23 +652,23 @@ const CleePIX = {
         webviewTag: true
       }
     });
-    if (this.configTemp.window.main.isMaximize)
+    if (mode === "main" && this.configTemp?.window.main.isMaximize)
       window.maximize();
     window.on("ready-to-show", () => {
       window.show();
     });
     window.on("moved", () => {
       const rect = window.getNormalBounds();
-      this.configTemp.window.main.x = rect.x;
-      this.configTemp.window.main.y = rect.y;
+      this.configTemp.window[mode].x = rect.x;
+      this.configTemp.window[mode].y = rect.y;
       this.config.set("window", this.configTemp.window);
     });
     window.on("maximize", () => {
-      this.configTemp.window.main.isMaximize = true;
+      this.configTemp.window[mode].isMaximize = true;
       this.config.set("window", this.configTemp.window);
     });
     window.on("unmaximize", () => {
-      this.configTemp.window.main.isMaximize = false;
+      this.configTemp.window[mode].isMaximize = false;
       this.config.set("window", this.configTemp.window);
     });
     window.webContents.setWindowOpenHandler((details) => {

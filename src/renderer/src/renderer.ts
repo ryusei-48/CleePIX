@@ -96,8 +96,7 @@ export const CleePIX: {
 
     window.addEventListener('keydown', (e) => {
       if ( e.ctrlKey && e.shiftKey && e.code === 'KeyA' ) {
-        window.electron.ipcRenderer.invoke('set-metadata-all-bookmarks', CleePIX.currentInstanceId)
-          .then((result) => { console.log(result) });
+        window.electron.ipcRenderer.send('window-hide', 'test');
       }else if ( e.ctrlKey && e.shiftKey && e.code === 'KeyD' ) {
         window.electron.ipcRenderer.invoke('get-rss-feed', 'https://forest.watch.impress.co.jp/')
           .then((res) => {
@@ -125,6 +124,11 @@ export const CleePIX: {
     this.liveDom.base.querySelector<HTMLButtonElement>('div#minimize-win button')
       ?.addEventListener('click', () => {
         window.electron.ipcRenderer.send('window-minize');
+      });
+
+    this.liveDom.base.querySelector<HTMLButtonElement>('div#hide-win button')
+      ?.addEventListener('click', () => {
+        window.electron.ipcRenderer.send('window-hide', 'test');
       });
 
     this.liveDom.base.querySelector<HTMLDivElement>('main#insert-panel')

@@ -174,12 +174,12 @@ header {
   -webkit-app-region: drag;
   @include flexbese;
   .app-name {
-    flex-basis: calc(100% - 176px);
+    flex-basis: calc(100% - 216px);
     height: 100%;
   }
   .app-setings,
   #minimize-win,
-  #maximize-win {
+  #maximize-win, #hide-win {
     flex-basis: 40px;
     height: 100%;
     button {
