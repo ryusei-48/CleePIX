@@ -74,9 +74,9 @@ const CleePIX = {
     if (this.config.size === 0) {
       this.config.store = {
         window: {
-          main: { x: null, y: null, isMaximize: false },
-          feedReader: { x: null, y: null, isMaximize: false },
-          clipboad: { x: null, y: null, isMaximize: false }
+          main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
+          feedReader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
+          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: "default",
@@ -389,10 +389,19 @@ const CleePIX = {
       this.Windows.main?.webContents.openDevTools();
     });
     electron.ipcMain.on("window-hide", (_, windowName) => {
-      this.Windows.main?.hide();
+      this.Windows[windowName]?.hide();
+    });
+    electron.ipcMain.on("clipboard-win-open", () => {
+      if (!this.Windows.clipboard?.isVisible()) {
+        this.Windows.clipboard?.show();
+      }
     });
     electron.app.whenReady().then(() => {
       this.Windows.main = this.createWindowInstance("main");
+      this.Windows.clipboard = this.createWindowInstance("clipboard");
+      this.Windows.main?.on("ready-to-show", () => {
+        this.Windows.main?.show();
+      });
       const tray = new electron.Tray(electron.nativeImage.createFromPath(appIcon));
       const contextMenu = electron.Menu.buildFromTemplate([
         { label: "アプリを表示", type: "normal" },
@@ -408,6 +417,29 @@ const CleePIX = {
           this.Windows.main?.show();
         }
       });
+      electron.globalShortcut.register("CommandOrControl+Shift+C", () => {
+        if (this.Windows.main?.isVisible()) {
+          this.Windows.main?.hide();
+        } else
+          this.Windows.main?.show();
+      });
+      electron.globalShortcut.register("CommandOrControl+Shift+A", () => {
+        this.Windows.clipboard?.show();
+      });
+      setInterval(() => {
+        const formats = electron.clipboard.availableFormats();
+        if (formats.length > 0) {
+          if (formats[0].indexOf("text/plain") >= 0) {
+            electron.clipboard.readText();
+          } else if (formats[0].indexOf("text/html") >= 0) {
+            electron.clipboard.readHTML();
+          } else if (formats[0].indexOf("text/rtf") >= 0) {
+            electron.clipboard.readRTF();
+          } else if (formats[0].indexOf("image/") >= 0) {
+            electron.clipboard.readImage();
+          }
+        }
+      }, 20);
       electron.app.on("activate", () => {
         if (electron.BrowserWindow.getAllWindows().length === 0)
           CleePIX.createWindowInstance();
@@ -415,6 +447,7 @@ const CleePIX = {
     });
     electron.app.on("window-all-closed", () => {
       if (process.platform !== "darwin") {
+        electron.globalShortcut.unregisterAll();
         electron.app.quit();
       }
     });
@@ -635,11 +668,11 @@ const CleePIX = {
   createWindowInstance: function(mode) {
     const windowConfig = this.configTemp.window[mode];
     const window = new electron.BrowserWindow({
-      width: 1360,
-      minWidth: 1100,
+      width: windowConfig.width,
+      minWidth: windowConfig.minWidth,
       x: windowConfig.x ? windowConfig.x : void 0,
-      height: 830,
-      minHeight: 671,
+      height: windowConfig.height,
+      minHeight: windowConfig.minHeight,
       y: windowConfig.y ? windowConfig.y : void 0,
       show: false,
       frame: false,
@@ -654,9 +687,6 @@ const CleePIX = {
     });
     if (mode === "main" && this.configTemp?.window.main.isMaximize)
       window.maximize();
-    window.on("ready-to-show", () => {
-      window.show();
-    });
     window.on("moved", () => {
       const rect = window.getNormalBounds();
       this.configTemp.window[mode].x = rect.x;
@@ -675,10 +705,22 @@ const CleePIX = {
       electron.shell.openExternal(details.url);
       return { action: "deny" };
     });
+    let loadFile = "";
+    switch (mode) {
+      case "feedreader":
+        loadFile = "/feedreader.html";
+        break;
+      case "clipboard":
+        loadFile = "/clipboard.html";
+        break;
+      default:
+        loadFile = "/index.html";
+        break;
+    }
     if (!electron.app.isPackaged && process.env["ELECTRON_RENDERER_URL"]) {
-      window.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+      window.loadURL(process.env["ELECTRON_RENDERER_URL"] + loadFile);
     } else {
-      window.loadFile(path.join(__dirname, "../renderer/index.html"));
+      window.loadFile(path.join(__dirname, `../renderer${loadFile}`));
     }
     return window;
   }

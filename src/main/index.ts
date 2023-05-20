@@ -1,4 +1,7 @@
-import { app, shell, BrowserWindow, ipcMain, NativeImage, nativeTheme, Menu, Tray, nativeImage } from 'electron';
+import {
+  app, shell, BrowserWindow, ipcMain, nativeTheme, Menu, Tray, nativeImage,
+  clipboard, globalShortcut
+} from 'electron';
 import Store from 'electron-store';
 import { join, parse } from 'path'
 import fs from "fs";
@@ -14,11 +17,15 @@ import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 import RssFeedParser from "rss-parser";
 
+export type windowInitValues = {
+  width: number, height: number, minWidth: number, minHeight: number,
+  x: number | null, y: number | null, isMaximize: boolean
+}
+
 export type storeConfig = {
   window: {
-    main: { x: number | null, y: number | null, isMaximize: boolean },
-    feedReader: { x: number | null, y: number | null, isMaximize: boolean },
-    clipboard: { x: number | null, y: number | null, isMaximize: boolean }
+    main: windowInitValues, feedReader: windowInitValues,
+    clipboard: windowInitValues
   },
   instance?: { label: string, id: number, path: string }[],
   cache?: {
@@ -64,9 +71,9 @@ const CleePIX: {
     if (this.config.size === 0) {
       this.config.store = {
         window: {
-          main: { x: null, y: null, isMaximize: false },
-          feedReader: { x: null, y: null, isMaximize: false },
-          clipboad: { x: null, y: null, isMaximize: false }
+          main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
+          feedReader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
+          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: 'default', id: 1,
@@ -386,12 +393,23 @@ const CleePIX: {
     });
 
     ipcMain.on('window-hide', (_, windowName) => {
-      this.Windows.main?.hide();
+      this.Windows[ windowName ]?.hide();
+    });
+
+    ipcMain.on('clipboard-win-open', () => {
+      if ( !this.Windows.clipboard?.isVisible() ) {
+        this.Windows.clipboard?.show();
+      }
     });
 
     app.whenReady().then( () => {
 
       this.Windows.main = this.createWindowInstance('main');
+      this.Windows.clipboard = this.createWindowInstance('clipboard');
+
+      this.Windows.main?.on('ready-to-show', () => {
+        this.Windows.main?.show();
+      });
 
       const tray = new Tray(nativeImage.createFromPath( appIcon ));
       const contextMenu = Menu.buildFromTemplate([
@@ -407,9 +425,39 @@ const CleePIX: {
         if ( !this.Windows.main?.isVisible() ) {
           this.Windows.main?.show(); 
         }
-        //console.log(this.Windows.main?.isVisible());
-        //this.Windows.main?.show();
       });
+
+      globalShortcut.register('CommandOrControl+Shift+C', () => {
+        if ( this.Windows.main?.isVisible() ) {
+          this.Windows.main?.hide();
+        } else this.Windows.main?.show();
+      });
+
+      globalShortcut.register('CommandOrControl+Shift+A', () => {
+        this.Windows.clipboard?.show();
+      });
+
+      let clipTmp: string | Electron.NativeImage = '';
+      setInterval(() => {
+        const formats = clipboard.availableFormats();
+        if ( formats.length > 0 ) {
+          let clipdata: string | Electron.NativeImage | null = null;
+          if ( formats[0].indexOf('text/plain') >= 0 ) {
+            clipdata = clipboard.readText();
+          } else if ( formats[0].indexOf('text/html') >= 0 ) {
+            clipdata = clipboard.readHTML();
+          } else if ( formats[0].indexOf('text/rtf') >= 0 ) {
+            clipdata = clipboard.readRTF();
+          } else if ( formats[0].indexOf('image/') >= 0 ) {
+            clipdata = clipboard.readImage();
+          }
+
+          if ( clipdata && clipdata != clipTmp ) {
+            clipTmp = clipdata;
+            //console.log( clipdata );
+          }
+        }
+      }, 20);
 
       app.on('activate', () => {
         // On macOS it's common to re-create a window in the app when the
@@ -423,6 +471,7 @@ const CleePIX: {
     // explicitly with Cmd + Q.
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
+        globalShortcut.unregisterAll();
         app.quit()
       }
     });
@@ -656,11 +705,13 @@ const CleePIX: {
 
   createWindowInstance: function ( mode ) {
 
-    const windowConfig = this.configTemp!.window[ mode ];
+    const windowConfig = <windowInitValues>this.configTemp!.window[ mode ];
 
     const window = new BrowserWindow({
-      width: 1360, minWidth: 1100, x: windowConfig.x ? windowConfig.x : undefined,
-      height: 830, minHeight: 671, y: windowConfig.y ? windowConfig.y : undefined,
+      width: windowConfig.width, minWidth: windowConfig.minWidth,
+      x: windowConfig.x ? windowConfig.x : undefined,
+      height: windowConfig.height, minHeight: windowConfig.minHeight,
+      y: windowConfig.y ? windowConfig.y : undefined,
       show: false, frame: false,
       autoHideMenuBar: true,
       backgroundColor: "black",
@@ -672,10 +723,6 @@ const CleePIX: {
     });
 
     if ( mode === 'main' && this.configTemp?.window.main.isMaximize ) window.maximize();
-
-    window.on('ready-to-show', () => {
-      window.show();
-    });
 
     window.on('moved', () => {
       const rect = window.getNormalBounds();
@@ -699,12 +746,22 @@ const CleePIX: {
       return { action: 'deny' }
     })
 
+    let loadFile: string = '';
+    switch ( mode ) {
+      case 'feedreader':
+        loadFile = '/feedreader.html'; break;
+      case 'clipboard':
+        loadFile = '/clipboard.html'; break;
+      default:
+        loadFile = '/index.html'; break;
+    }
+
     // HMR for renderer base on electron-vite cli.
     // Load the remote URL for development or the local html file for production.
     if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-      window.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      window.loadURL( process.env['ELECTRON_RENDERER_URL'] + loadFile );
     } else {
-      window.loadFile(join(__dirname, '../renderer/index.html'))
+      window.loadFile( join(__dirname, `../renderer${ loadFile }` ));
     }
 
     return window;

@@ -128,7 +128,12 @@ export const CleePIX: {
 
     this.liveDom.base.querySelector<HTMLButtonElement>('div#hide-win button')
       ?.addEventListener('click', () => {
-        window.electron.ipcRenderer.send('window-hide', 'test');
+        window.electron.ipcRenderer.send('window-hide', 'main');
+      });
+
+    this.liveDom.instancePanel.querySelector<HTMLButtonElement>('button#open-clip-manage-btn')!
+      .addEventListener('click', () => {
+        window.electron.ipcRenderer.send('clipboard-win-open');
       });
 
     this.liveDom.base.querySelector<HTMLDivElement>('main#insert-panel')
