@@ -1,4 +1,4 @@
-export const includeDom: {
+export const main: {
 
   initDivDom: (inert?: boolean) => HTMLDivElement,
   base: () => HTMLDivElement,
@@ -257,7 +257,7 @@ export const includeDom: {
 
     base: function () {
 
-      const dom = includeDom.initDivDom( false );
+      const dom = main.initDivDom( false );
       dom.classList.add('panel-wrap');
       dom.innerHTML = `
         <div class="content-elements-wrap">
@@ -309,7 +309,7 @@ export const includeDom: {
 
     bookmarkItem: function () {
 
-      const dom = includeDom.initDivDom( false );
+      const dom = main.initDivDom( false );
       dom.classList.add('bookmark-item', 'animate__animated', 'animate__fadeIn');
       dom.innerHTML = `
         <div class="content">
@@ -326,4 +326,37 @@ export const includeDom: {
       return dom;
     }
   }
+}
+
+export const clipboard: {
+
+  base: () => HTMLDivElement
+} = {
+
+  base: function () {
+
+    const dom = main.initDivDom(false);
+    dom.innerHTML = `
+      <header class="animate__animated animate__fadeIn">
+        <div class="app-name">
+          <h1>cleepix</h1>
+        </div>
+        <div id="fixation-win"><button aria-label="ウィンドウを最前面に固定" title="ウィンドウを最前面に固定"><i class="fa-solid fa-thumbtack"></i></button></div>
+        <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
+        <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
+        <div id="close-win"><button aria-label="ウィンドウを隠す"><i class="fa-solid fa-xmark"></i></button></div>
+      </header>
+      <main id="insert-panel" class="animate__animated animate__fadeIn"></main>
+      <div class="tmp-doms">
+        <div hidden id="show-tag-context-menu-wrap"></div>
+        <div hidden id="show-tag-context-menu"></div>
+        <div inert id="show-loading-efect">
+          <div class="spinner">
+            <div></div> <div></div><div></div><div></div>    
+          </div>
+        </div>
+      </div>
+      `;
+    return dom;
+  },
 }

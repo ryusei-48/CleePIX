@@ -3,7 +3,7 @@ import "animate.css";
 import "../../../node_modules/quill/dist/quill.snow.css";
 import Quill from "quill";
 import "../../preload/index.d";
-import {includeDom} from "./include.dom";
+import { main as includeDom } from "./include.dom";
 
 declare global {
   interface Window {
@@ -134,6 +134,11 @@ export const CleePIX: {
     this.liveDom.instancePanel.querySelector<HTMLButtonElement>('button#open-clip-manage-btn')!
       .addEventListener('click', () => {
         window.electron.ipcRenderer.send('clipboard-win-open');
+      });
+
+    this.liveDom.instancePanel.querySelector<HTMLButtonElement>('button#open-feed-reader-btn')!
+      .addEventListener('click', () => {
+        window.electron.ipcRenderer.send('feedreader-win-open');
       });
 
     this.liveDom.base.querySelector<HTMLDivElement>('main#insert-panel')

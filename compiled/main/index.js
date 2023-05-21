@@ -63,8 +63,8 @@ const CleePIX = {
   Windows: {
     forScraping: null,
     forScreenshot: null,
-    feedReader: null,
-    clipboad: null
+    feedreader: null,
+    clipboard: null
   },
   storage: {},
   config: new Store(
@@ -75,8 +75,8 @@ const CleePIX = {
       this.config.store = {
         window: {
           main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          feedReader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false }
+          feedreader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
+          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false, isFixation: false }
         },
         instance: [{
           label: "default",
@@ -195,14 +195,14 @@ const CleePIX = {
       });
       electron.app.quit();
     });
-    electron.ipcMain.on("window-maximize", () => {
-      if (this.Windows.main?.isMaximized()) {
-        this.Windows.main?.unmaximize();
+    electron.ipcMain.on("window-maximize", (_, windowName) => {
+      if (this.Windows[windowName]?.isMaximized()) {
+        this.Windows[windowName]?.unmaximize();
       } else
-        this.Windows.main?.maximize();
+        this.Windows[windowName]?.maximize();
     });
-    electron.ipcMain.on("window-minize", () => {
-      this.Windows.main?.minimize();
+    electron.ipcMain.on("window-minize", (_, windowName) => {
+      this.Windows[windowName]?.minimize();
     });
     electron.ipcMain.on("ite-name-update", (_, ite) => {
       this.config.store.instance.forEach((i, index) => {
@@ -396,19 +396,41 @@ const CleePIX = {
         this.Windows.clipboard?.show();
       }
     });
+    electron.ipcMain.handle("clipboard-win-show-top", () => {
+      if (this.Windows.clipboard?.isAlwaysOnTop()) {
+        this.Windows.clipboard?.setAlwaysOnTop(false);
+        this.configTemp.window.clipboard.isFixation = false;
+        this.config.set("window", this.configTemp?.window);
+        return false;
+      } else {
+        this.Windows.clipboard?.setAlwaysOnTop(true);
+        this.configTemp.window.clipboard.isFixation = true;
+        this.config.set("window", this.configTemp?.window);
+        return true;
+      }
+    });
+    electron.ipcMain.on("feedreader-win-open", () => {
+      if (!this.Windows.feedreader?.isVisible()) {
+        this.Windows.feedreader?.show();
+      }
+    });
     electron.app.whenReady().then(() => {
       this.Windows.main = this.createWindowInstance("main");
       this.Windows.clipboard = this.createWindowInstance("clipboard");
+      this.Windows.feedreader = this.createWindowInstance("feedreader");
       this.Windows.main?.on("ready-to-show", () => {
         this.Windows.main?.show();
       });
+      if (this.configTemp?.window.clipboard.isFixation) {
+        this.Windows.clipboard?.setAlwaysOnTop(true);
+      }
       const tray = new electron.Tray(electron.nativeImage.createFromPath(appIcon));
       const contextMenu = electron.Menu.buildFromTemplate([
-        { label: "アプリを表示", type: "normal" },
-        { label: "フィードリーダー", type: "normal" },
-        { label: "クリップボード", type: "normal" },
-        { label: "設定", type: "normal" },
-        { label: "終了", type: "normal", role: "quit" }
+        { id: "1", label: "アプリを表示", type: "normal", click: trayMenuHandler },
+        { id: "2", label: "フィードリーダー", type: "normal", click: trayMenuHandler },
+        { id: "3", label: "クリップボード", type: "normal", click: trayMenuHandler },
+        { id: "4", label: "設定", type: "normal", click: trayMenuHandler },
+        { id: "5", label: "終了", type: "normal", role: "quit" }
       ]);
       tray.setToolTip("CleePIX");
       tray.setContextMenu(contextMenu);
@@ -417,6 +439,22 @@ const CleePIX = {
           this.Windows.main?.show();
         }
       });
+      function trayMenuHandler(menu) {
+        switch (menu.id) {
+          case "1":
+            CleePIX.Windows.main?.show();
+            break;
+          case "2":
+            CleePIX.Windows.feedreader?.show();
+            break;
+          case "3":
+            CleePIX.Windows.clipboard?.show();
+            break;
+          default:
+            CleePIX.Windows.main?.show();
+            break;
+        }
+      }
       electron.globalShortcut.register("CommandOrControl+Shift+C", () => {
         if (this.Windows.main?.isVisible()) {
           this.Windows.main?.hide();
@@ -442,7 +480,7 @@ const CleePIX = {
       }, 20);
       electron.app.on("activate", () => {
         if (electron.BrowserWindow.getAllWindows().length === 0)
-          CleePIX.createWindowInstance();
+          CleePIX.createWindowInstance("main");
       });
     });
     electron.app.on("window-all-closed", () => {

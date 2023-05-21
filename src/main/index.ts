@@ -3,7 +3,7 @@ import {
   clipboard, globalShortcut
 } from 'electron';
 import Store from 'electron-store';
-import { join, parse } from 'path'
+import { join } from 'path'
 import fs from "fs";
 //import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
@@ -24,8 +24,8 @@ export type windowInitValues = {
 
 export type storeConfig = {
   window: {
-    main: windowInitValues, feedReader: windowInitValues,
-    clipboard: windowInitValues
+    main: windowInitValues, feedreader: windowInitValues,
+    clipboard: windowInitValues & { isFixation: boolean }
   },
   instance?: { label: string, id: number, path: string }[],
   cache?: {
@@ -43,7 +43,7 @@ const CleePIX: {
   Windows: {
     main?: BrowserWindow, forScraping: BrowserWindow | null,
     forScreenshot: BrowserWindow | null,
-    feedReader: BrowserWindow | null, clipboard: BrowserWindow | null
+    feedreader: BrowserWindow | null, clipboard: BrowserWindow | null
   },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
   config: Store<storeConfig>, configTemp?: storeConfig,
@@ -61,7 +61,7 @@ const CleePIX: {
 } = {
 
   Windows: {
-    forScraping: null, forScreenshot: null, feedReader: null, clipboad: null,
+    forScraping: null, forScreenshot: null, feedreader: null, clipboard: null,
   }, storage: {},
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
@@ -72,8 +72,8 @@ const CleePIX: {
       this.config.store = {
         window: {
           main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          feedReader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false }
+          feedreader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
+          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false, isFixation: false }
         },
         instance: [{
           label: 'default', id: 1,
@@ -193,14 +193,14 @@ const CleePIX: {
       app.quit();
     });
 
-    ipcMain.on('window-maximize', () => {
-      if (this.Windows.main?.isMaximized()) {
-        this.Windows.main?.unmaximize();
-      } else this.Windows.main?.maximize();
+    ipcMain.on('window-maximize', (_, windowName) => {
+      if (this.Windows[ windowName ]?.isMaximized()) {
+        this.Windows[ windowName ]?.unmaximize();
+      } else this.Windows[ windowName ]?.maximize();
     });
 
-    ipcMain.on('window-minize', () => {
-      this.Windows.main?.minimize();
+    ipcMain.on('window-minize', (_, windowName) => {
+      this.Windows[ windowName ]?.minimize();
     });
 
     ipcMain.on('ite-name-update', (_, ite) => {
@@ -396,28 +396,60 @@ const CleePIX: {
       this.Windows[ windowName ]?.hide();
     });
 
+    // ##############################################
+    // クリップボードウィンドウ
+    // ##############################################
     ipcMain.on('clipboard-win-open', () => {
       if ( !this.Windows.clipboard?.isVisible() ) {
         this.Windows.clipboard?.show();
       }
     });
 
+    ipcMain.handle('clipboard-win-show-top', () => {
+      if ( this.Windows.clipboard?.isAlwaysOnTop() ) {
+        this.Windows.clipboard?.setAlwaysOnTop( false );
+        this.configTemp!.window.clipboard.isFixation = false;
+        this.config.set('window', this.configTemp?.window); return false;
+      } else {
+        this.Windows.clipboard?.setAlwaysOnTop( true );
+        this.configTemp!.window.clipboard.isFixation = true;
+        this.config.set('window', this.configTemp?.window);return true;
+      }
+    });
+
+    // ##############################################
+    // クリップボードウィンドウ
+    // ##############################################
+    ipcMain.on('feedreader-win-open', () => {
+      if ( !this.Windows.feedreader?.isVisible() ) {
+        this.Windows.feedreader?.show();
+      }
+    });
+
+    // ##############################################
+    // アプリ起動準備完了時の処理
+    // ##############################################
     app.whenReady().then( () => {
 
       this.Windows.main = this.createWindowInstance('main');
       this.Windows.clipboard = this.createWindowInstance('clipboard');
+      this.Windows.feedreader = this.createWindowInstance('feedreader');
 
       this.Windows.main?.on('ready-to-show', () => {
         this.Windows.main?.show();
       });
 
+      if ( this.configTemp?.window.clipboard.isFixation ) {
+        this.Windows.clipboard?.setAlwaysOnTop( true );
+      }
+
       const tray = new Tray(nativeImage.createFromPath( appIcon ));
       const contextMenu = Menu.buildFromTemplate([
-        { label: 'アプリを表示', type: 'normal' },
-        { label: 'フィードリーダー', type: 'normal' },
-        { label: 'クリップボード', type: 'normal' },
-        { label: '設定', type: 'normal' },
-        { label: '終了', type: 'normal', role: 'quit' }
+        { id: '1', label: 'アプリを表示', type: 'normal', click: trayMenuHandler },
+        { id: '2', label: 'フィードリーダー', type: 'normal', click: trayMenuHandler },
+        { id: '3', label: 'クリップボード', type: 'normal', click: trayMenuHandler },
+        { id: '4', label: '設定', type: 'normal', click: trayMenuHandler },
+        { id: '5', label: '終了', type: 'normal', role: 'quit' }
       ]);
       tray.setToolTip('CleePIX');
       tray.setContextMenu(contextMenu);
@@ -426,6 +458,19 @@ const CleePIX: {
           this.Windows.main?.show(); 
         }
       });
+
+      function trayMenuHandler( menu: Electron.MenuItem ) {
+        switch ( menu.id ) {
+          case '1':
+            CleePIX.Windows.main?.show(); break;
+          case '2':
+            CleePIX.Windows.feedreader?.show(); break;
+          case '3':
+            CleePIX.Windows.clipboard?.show(); break;
+          default:
+            CleePIX.Windows.main?.show(); break;
+        }
+      }
 
       globalShortcut.register('CommandOrControl+Shift+C', () => {
         if ( this.Windows.main?.isVisible() ) {
@@ -462,7 +507,7 @@ const CleePIX: {
       app.on('activate', () => {
         // On macOS it's common to re-create a window in the app when the
         // dock icon is clicked and there are no other windows open.
-        if (BrowserWindow.getAllWindows().length === 0) CleePIX.createWindowInstance();
+        if (BrowserWindow.getAllWindows().length === 0) CleePIX.createWindowInstance('main');
       });
     });
 

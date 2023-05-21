@@ -33,6 +33,13 @@ export default defineConfig({
   renderer: {
     build: {
       minify: true, chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, './src/renderer/index.html'),
+          clipboard: resolve(__dirname, './src/renderer/clipboard.html'),
+          feedreader: resolve(__dirname, './src/renderer/feedreader.html')
+        }
+      },
       outDir: resolve(__dirname, 'compiled/renderer')
     },
     plugins: [ sass() ]
