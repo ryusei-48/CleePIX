@@ -3,33 +3,28 @@ import "animate.css";
 import "../../../node_modules/quill/dist/quill.snow.css";
 import "../../preload/index.d";
 import { clipboard as includeDom } from "./include.dom";
+import { storeConfig } from "./index.d";
 
 export const clipboard: {
 
-  config?: {
-    window: {
-      clipboard: {
-        width: number, height: number, minWidth: number, minHeight: number,
-        x: number | null, y: number | null, isMaximize: boolean, isFixation: boolean
-      }
-    }
-  },
+  config?: storeConfig,
   init: () => void,
-  windowControl: () => void,
+  windowControl: () => void, contentPanel: () => void,
   liveDom: {
-    base: HTMLDivElement,
+    base: HTMLDivElement, contentPanel: HTMLDivElement
   }
 
 } = {
 
   liveDom: {
-    base: includeDom.base()
+    base: includeDom.base(), contentPanel: includeDom.contentPanel()
   },
 
   init: async function () {
 
     this.config = await window.electron.ipcRenderer.invoke('get-config');
     this.windowControl();
+    this.contentPanel();
   },
 
   windowControl: function () {
@@ -71,6 +66,12 @@ export const clipboard: {
       });
 
     document.getElementById('app')?.append(this.liveDom.base);
+  },
+
+  contentPanel: function () {
+
+    this.liveDom.base.querySelector<HTMLDivElement>('main#insert-panel')!
+      .insertAdjacentElement('beforeend', this.liveDom.contentPanel);
   }
 }
 

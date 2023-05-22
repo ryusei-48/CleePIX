@@ -28,7 +28,7 @@ export const main: {
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
-          <h1>cleepix</h1>
+          <h1>CleePIX</h1>
         </div>
         <div class="app-setings"><button id="app-setings" aria-label="設定"><i class="fa-solid fa-gear"></i> 設定</button></div>
         <div id="hide-win"><button title="ウィンドウを隠す" aria-label="ウィンドウを隠す"><i class="fa-regular fa-eye-slash"></i></button></div>
@@ -330,7 +330,7 @@ export const main: {
 
 export const clipboard: {
 
-  base: () => HTMLDivElement
+  base: () => HTMLDivElement, contentPanel: () => HTMLDivElement
 } = {
 
   base: function () {
@@ -339,7 +339,7 @@ export const clipboard: {
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
-          <h1>cleepix</h1>
+          <h1>クリップボードマネージャー - CleePIX</h1>
         </div>
         <div id="fixation-win"><button aria-label="ウィンドウを最前面に固定" title="ウィンドウを最前面に固定"><i class="fa-solid fa-thumbtack"></i></button></div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
@@ -359,4 +359,18 @@ export const clipboard: {
       `;
     return dom;
   },
+
+  contentPanel: function () {
+
+    const dom = main.initDivDom(false);
+    dom.classList.add('content-panel');
+    dom.innerHTML = `
+      <div class="tab-labels">
+        <div class="label"><button id="history-tab-btn">履歴</button></div>
+        <div class="label"><button id="search-tab-btn">検索</button></div>
+        <div class="label"><button id="tmp-tab-btn">一時保存</button></div>
+      </div>
+    `;
+    return dom;
+  }
 }

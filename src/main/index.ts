@@ -5,7 +5,6 @@ import {
 import Store from 'electron-store';
 import { join } from 'path'
 import fs from "fs";
-//import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
 import Database from "better-sqlite3-multiple-ciphers";
 import appIcon from './logo.png?asset';
@@ -16,25 +15,9 @@ import axios from "axios";
 import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 import RssFeedParser from "rss-parser";
+import { windowInitValues, storeConfig } from "./index.d";
 
-export type windowInitValues = {
-  width: number, height: number, minWidth: number, minHeight: number,
-  x: number | null, y: number | null, isMaximize: boolean
-}
-
-export type storeConfig = {
-  window: {
-    main: windowInitValues, feedreader: windowInitValues,
-    clipboard: windowInitValues & { isFixation: boolean }
-  },
-  instance?: { label: string, id: number, path: string }[],
-  cache?: {
-    currentInstanceId: number,
-    tagTreeDomStrings: { [key: number]: string } | null,
-    selectedTags: { [key: number]: number } | null
-  }
-}
-
+const APP_NAME = 'CleePIX';
 const USER_DATA_PATH = app.getPath('userData');
 const STORAGE_PATH = USER_DATA_PATH + '/storage/database';
 
@@ -88,6 +71,7 @@ const CleePIX: {
       }
     }
 
+    app.setName( APP_NAME );
     nativeTheme.themeSource = 'dark';
 
     this.configTemp = this.config.store;
@@ -434,6 +418,8 @@ const CleePIX: {
       this.Windows.main = this.createWindowInstance('main');
       this.Windows.clipboard = this.createWindowInstance('clipboard');
       this.Windows.feedreader = this.createWindowInstance('feedreader');
+
+      this.Windows.clipboard.setTitle( 'クリップボードマネージャー - ' + APP_NAME );
 
       this.Windows.main?.on('ready-to-show', () => {
         this.Windows.main?.show();

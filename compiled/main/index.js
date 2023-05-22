@@ -57,6 +57,7 @@ function importBookmarksWorker(options) {
 function getBookmarksWorker(options) {
   return new node_worker_threads.Worker(require.resolve("./get_bookmarks.js"), options);
 }
+const APP_NAME = "CleePIX";
 const USER_DATA_PATH = electron.app.getPath("userData");
 const STORAGE_PATH = USER_DATA_PATH + "/storage/database";
 const CleePIX = {
@@ -94,6 +95,7 @@ const CleePIX = {
         }
       };
     }
+    electron.app.setName(APP_NAME);
     electron.nativeTheme.themeSource = "dark";
     this.configTemp = this.config.store;
     this.config.store.instance.forEach((db) => {
@@ -418,6 +420,7 @@ const CleePIX = {
       this.Windows.main = this.createWindowInstance("main");
       this.Windows.clipboard = this.createWindowInstance("clipboard");
       this.Windows.feedreader = this.createWindowInstance("feedreader");
+      this.Windows.clipboard.setTitle("クリップボードマネージャー - " + APP_NAME);
       this.Windows.main?.on("ready-to-show", () => {
         this.Windows.main?.show();
       });
