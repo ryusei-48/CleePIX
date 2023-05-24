@@ -56,7 +56,7 @@ const CleePIX: {
         window: {
           main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
           feedreader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          clipboard: { width: 500, minWidth: 500, height: 700, minHeight: 700, x: null, y: null, isMaximize: false, isFixation: false }
+          clipboard: { width: 400, minWidth: 400, height: 580, minHeight: 580, x: null, y: null, isMaximize: false, isFixation: false }
         },
         instance: [{
           label: 'default', id: 1,
@@ -419,8 +419,6 @@ const CleePIX: {
       this.Windows.clipboard = this.createWindowInstance('clipboard');
       this.Windows.feedreader = this.createWindowInstance('feedreader');
 
-      this.Windows.clipboard.setTitle( 'クリップボードマネージャー - ' + APP_NAME );
-
       this.Windows.main?.on('ready-to-show', () => {
         this.Windows.main?.show();
       });
@@ -468,27 +466,41 @@ const CleePIX: {
         this.Windows.clipboard?.show();
       });
 
-      let clipTmp: string | Electron.NativeImage = '';
-      setInterval(() => {
-        const formats = clipboard.availableFormats();
-        if ( formats.length > 0 ) {
-          let clipdata: string | Electron.NativeImage | null = null;
-          if ( formats[0].indexOf('text/plain') >= 0 ) {
-            clipdata = clipboard.readText();
-          } else if ( formats[0].indexOf('text/html') >= 0 ) {
-            clipdata = clipboard.readHTML();
-          } else if ( formats[0].indexOf('text/rtf') >= 0 ) {
-            clipdata = clipboard.readRTF();
-          } else if ( formats[0].indexOf('image/') >= 0 ) {
-            clipdata = clipboard.readImage();
-          }
+      this.Windows.clipboard.webContents.on('did-finish-load', () => {
 
-          if ( clipdata && clipdata != clipTmp ) {
-            clipTmp = clipdata;
-            //console.log( clipdata );
+        let clipTmp: string | Electron.NativeImage = '';
+        setInterval(() => {
+          const formats = clipboard.availableFormats();
+          if ( formats.length > 0 ) {
+            let clipdata: string | Electron.NativeImage | null = null;
+            if ( formats[0].indexOf('text/plain') >= 0 ) {
+              clipdata = clipboard.readText();
+            } else if ( formats[0].indexOf('text/html') >= 0 ) {
+              clipdata = clipboard.readHTML();
+            } else if ( formats[0].indexOf('text/rtf') >= 0 ) {
+              clipdata = clipboard.readRTF();
+            } else if ( formats[0].indexOf('image/') >= 0 ) {
+              clipdata = clipboard.readImage();
+            }
+
+            if ( clipdata && clipdata != clipTmp ) {
+              clipTmp = clipdata;
+              this.Windows.clipboard?.webContents
+                .send('clipboard-update', [...formats.map((format) => {
+                  if ( format.indexOf('text/plain') >= 0 ) {
+                    return [ format, clipboard.readText() ];
+                  } else if ( format.indexOf('text/html') >= 0 ) {
+                    return [ format, clipboard.readHTML() ];
+                  } else if ( format.indexOf('text/rtf') >= 0 ) {
+                    return [ format, clipboard.readRTF() ];
+                  } else if ( format.indexOf('image/') >= 0 ) {
+                    return [ format, clipboard.readImage() ];
+                  } else return;
+                })]);
+            }
           }
-        }
-      }, 20);
+        }, 20);
+      });
 
       app.on('activate', () => {
         // On macOS it's common to re-create a window in the app when the

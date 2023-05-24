@@ -1,0 +1,170 @@
+@charset "utf-8";
+/* webフォント「Noto Serif JP」 */
+@import url("https://fonts.googleapis.com/css?family=Noto+Sans+JP");
+/* fontawesomeの読み込み */
+//@import url("https://use.fontawesome.com/releases/v6.2.1/css/all.css");
+//@import './fontawesome-all.min.css';
+
+$text-color: #c6c4be;
+$bg-color: #0f0f0f;
+$hover-bg-color: #272727;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  color: white;
+  font-family: "Noto Sans JP", "Meiryo", "Hiragino Kaku Gothic ProN", "Hiragino Kaku Gothic Pro", "Noto Sans Japanese",
+    sans-serif, "Font Awesome 6 Free";
+  font-size: 12pt;
+  font-weight: 1;
+  line-height: 1.6;
+  background-attachment: fixed;
+  background-size: cover;
+  //background-color: rgba(49, 49, 49, 0.7);
+  //background-image: linear-gradient(112.1deg, rgb(32, 38, 57) 11.4%, rgb(63, 76, 119) 70.2%);
+  background-image: url(../img/windows_11/win10.jpg);
+  overflow: hidden;
+  height: 100vh;
+}
+
+h1 {
+  font-size: 12pt;
+  text-align: left;
+  font-weight: normal;
+}
+h2 {
+  font-size: 18pt;
+  text-align: center;
+}
+h3 {
+  font-size: 15pt;
+  text-align: center;
+}
+
+a {
+  text-decoration: none;
+}
+
+// スクロールバーカスタマイズ
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0);
+  border: none;
+  border-radius: 10px;
+  box-shadow: inset 0 0 2px #777;
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  display: none;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(65, 65, 65);
+  border-radius: 10px;
+  box-shadow: none;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background: rgb(65, 65, 65);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+input[type="search"],
+input[type="text"],
+input[type="url"],
+textarea {
+  color: $text-color;
+  background-color: #242323;
+  border: unset;
+  outline: unset;
+  &::placeholder {
+    font-size: 15pt;
+  }
+  &:focus {
+    outline: unset;
+  }
+}
+
+button {
+  background-color: transparent;
+  border: unset;
+  color: $text-color;
+  text-align: center;
+  cursor: pointer;
+}
+
+fieldset {
+  border: none;
+  margin-inline-start: unset;
+  margin-inline-end: unset;
+  min-inline-size: unset;
+  padding-block-start: unset;
+  padding-inline-start: unset;
+  padding-inline-end: unset;
+  padding-block-end: unset;
+  legend {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+}
+
+// fontawesomeサイズ指定用
+.ftom-24pt {
+  font-size: 24pt;
+}
+
+// ベースのflexbox
+@mixin flexbese($ac: stretch, $ai: normal, $jc: center) {
+  display: flex;
+  align-content: $ac;
+  align-items: $ai;
+  justify-content: $jc;
+  flex-flow: row wrap;
+  width: 100%;
+}
+
+@mixin pc-small {
+  @media (max-width: ( 600px )) {
+    @content;
+  }
+}
+@mixin pc-normal {
+  @media (max-width: ( 1400px )) {
+    @content;
+  }
+}
+@mixin pc-medium {
+  @media (max-width: ( 1920px )) {
+    @content;
+  }
+}
+@mixin pc-large {
+  @media (max-width: ( 2600px )) {
+    @content;
+  }
+}
+
+@mixin background( $t:.7 ) {
+  background: rgba(0, 0, 0, $t);
+  backdrop-filter: blur(10px) contrast(140%) brightness(90%);
+}
+
+@mixin background-modal {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px) contrast(140%) brightness(90%);
+}
+
+div.app-wrapper {
+  @include flexbese;
+  flex-flow: column;
+  height: 100vh;;
+}

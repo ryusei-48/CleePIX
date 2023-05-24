@@ -25,6 +25,7 @@ export const main: {
   base: function () {
 
     const dom = this.initDivDom(false);
+    dom.classList.add('app-wrapper');
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
@@ -328,18 +329,54 @@ export const main: {
   }
 }
 
-export const clipboard: {
+export const feedreader: {
 
-  base: () => HTMLDivElement, contentPanel: () => HTMLDivElement
+  base: () => HTMLDivElement
+
 } = {
 
   base: function () {
 
     const dom = main.initDivDom(false);
+    dom.classList.add('app-wrapper');
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
-          <h1>クリップボードマネージャー - CleePIX</h1>
+          <h1>FeedReader - CleePIX</h1>
+        </div>
+        <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
+        <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
+        <div id="close-win"><button aria-label="ウィンドウを隠す"><i class="fa-solid fa-xmark"></i></button></div>
+      </header>
+      <main id="insert-panel" class="animate__animated animate__fadeIn"></main>
+      <div class="tmp-doms">
+        <div hidden id="show-tag-context-menu-wrap"></div>
+        <div hidden id="show-tag-context-menu"></div>
+        <div inert id="show-loading-efect">
+          <div class="spinner">
+            <div></div> <div></div><div></div><div></div>    
+          </div>
+        </div>
+      </div>
+      `;
+    return dom;
+  },
+}
+
+export const clipboard: {
+
+  base: () => HTMLDivElement, contentPanel: () => HTMLDivElement
+
+} = {
+
+  base: function () {
+
+    const dom = main.initDivDom(false);
+    dom.classList.add('app-wrapper');
+    dom.innerHTML = `
+      <header class="animate__animated animate__fadeIn">
+        <div class="app-name">
+          <h1>Clipboard Manager - CleePIX</h1>
         </div>
         <div id="fixation-win"><button aria-label="ウィンドウを最前面に固定" title="ウィンドウを最前面に固定"><i class="fa-solid fa-thumbtack"></i></button></div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
@@ -366,9 +403,25 @@ export const clipboard: {
     dom.classList.add('content-panel');
     dom.innerHTML = `
       <div class="tab-labels">
-        <div class="label"><button id="history-tab-btn">履歴</button></div>
-        <div class="label"><button id="search-tab-btn">検索</button></div>
-        <div class="label"><button id="tmp-tab-btn">一時保存</button></div>
+        <div class="label">
+          <input class="tab" checked type="radio" name="top-tab-label" value="history" id="history-tab-btn">
+          <label role="button" tabindex="0" for="history-tab-btn">履歴</label>
+        </div>
+        <div class="label">
+          <input class="tab" type="radio" name="top-tab-label" value="search" id="search-tab-btn">
+          <label role="button" tabindex="0" for="search-tab-btn">検索</label>
+        </div>
+        <div class="label">
+          <input class="tab" type="radio" name="top-tab-label" value="tmp" id="tmp-tab-btn">
+          <label role="button" tabindex="0" for="tmp-tab-btn">一時保存</label>
+        </div>
+      </div>
+      <div class="tab-content">
+        <div class="content history show">
+          <ul class="record-list"></ul>
+        </div>
+        <div class="content search" inert>いいいいいいいいいいいいい</div>
+        <div class="content tmp" inert>うううううううううううううう</div>
       </div>
     `;
     return dom;

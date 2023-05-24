@@ -20,13 +20,7 @@ declare global {
 export const CleePIX: {
 
   init: () => void, currentInstanceId: number,
-  config: {
-    instance?: {label: string, id: number, path: string;}[],
-    cache?: {
-      currentInstanceId: number, selectedTags: { [key: number]: number } | null,
-      tagTreeDomStrings: {[key: number]: string;} | null;
-    }
-  },
+  config: storeConfig,
   instanceDBs: {label: string, id: number, path: string;}[],
   instanceLabels: string[], windowControl: () => void,
   AppSetingPanel: () => void,
@@ -75,8 +69,8 @@ export const CleePIX: {
     const config = await window.electron.ipcRenderer.invoke('get-config');
 
     this.config = config;
-    this.instanceDBs = config.instance;
-    this.currentInstanceId = config.cache.currentInstanceId;
+    this.instanceDBs = config.instance!;
+    this.currentInstanceId = config.cache!.currentInstanceId;
 
     this.windowControl();
     this.AppSetingPanel();
@@ -118,12 +112,12 @@ export const CleePIX: {
 
     this.liveDom.base.querySelector<HTMLButtonElement>('div#maximize-win button')
       ?.addEventListener('click', () => {
-        window.electron.ipcRenderer.send('window-maximize');
+        window.electron.ipcRenderer.send('window-maximize', 'main');
       });
 
     this.liveDom.base.querySelector<HTMLButtonElement>('div#minimize-win button')
       ?.addEventListener('click', () => {
-        window.electron.ipcRenderer.send('window-minize');
+        window.electron.ipcRenderer.send('window-minize', 'main');
       });
 
     this.liveDom.base.querySelector<HTMLButtonElement>('div#hide-win button')

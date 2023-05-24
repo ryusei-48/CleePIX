@@ -2,7 +2,7 @@ import "@fortawesome/fontawesome-free/js/all";
 import "animate.css";
 import "../../../node_modules/quill/dist/quill.snow.css";
 import "../../preload/index.d";
-import { clipboard } from "./include.dom";
+import { feedreader as includeDom } from "./include.dom";
 
 export const feedreader: {
 
@@ -15,7 +15,7 @@ export const feedreader: {
 } = {
 
   liveDom: {
-    base: clipboard.base()
+    base: includeDom.base()
   },
 
   init: function () {
