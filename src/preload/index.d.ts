@@ -1,6 +1,8 @@
 import { ElectronAPI, IpcRenderer as ir, WebFrame, NodeProcess } from '@electron-toolkit/preload';
 import { IpcRenderer, ipcRenderer, NativeImage } from "electron";
-import { storeConfig  as sc} from "../main/index.d";
+import "../main/index.d";
+
+type sc = storeConfig;
 
 declare global {
   type storeConfig = sc;
@@ -20,9 +22,10 @@ declare global {
     send( channel: 'window-maximize', arg: 'main' | 'clipboard' | 'feedreader' ): void;
     send( channel: 'window-minize', arg: 'main' | 'clipboard' | 'feedreader' ): void;
     send( channel: 'window-hide', arg: 'main' | 'clipboard' | 'feedreader' ): void;
+    send( channel: 'clipboard-write', arg: [ String, string ] ): void;
 
     on(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): this;
-    on( channel: 'clipboard-update', listener: ( event: IpcRendererEvent, arg: [ String, string | NativeImage ][] ) => void ): IpcRenderer
+    on( channel: 'clipboard-update', listener: ( event: IpcRendererEvent, arg: [ string, string ][] ) => void ): IpcRenderer
 
     invoke(channel: string, ...args: any[]): Promise<any>;
     invoke( channel: 'clipboard-win-show-top'): Promise<Boolean>;

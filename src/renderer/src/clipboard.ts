@@ -91,11 +91,62 @@ export const clipboard: {
       });
 
     window.electron.ipcRenderer.on('clipboard-update', (_, clipboard) => {
+
       const li = document.createElement('li');
+      const viewText = document.createElement('span');
+      const operation = document.createElement('span');
+      const copyButton = document.createElement('button');
       li.classList.add('record');
-      li.textContent = typeof clipboard[0][1] === 'string' ? clipboard[0][1] : '';
-      li.title = typeof clipboard[0][1] === 'string' ? clipboard[0][1] : '';
-      this.liveDom.__contentPanel.__history.recordList?.appendChild( li );
+      operation.classList.add('operation');
+      copyButton.classList.add('copy');
+      copyButton.title = 'クリップボードに送る';
+      copyButton.ariaLabel = 'クリップボードに送る';
+      copyButton.innerHTML = `<i class="fa-solid fa-copy"></i>`;
+
+      copyButton.addEventListener('click', () => {
+        if ( clipboard[0][0].indexOf('image/') >= 0 ) {
+          window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1].split(',')[1] ]);
+          //console.log( [ clipboard[0][0], clipboard[0][1].split(',')[1] ] );
+        } else {
+          window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1] ]);
+          //console.log( [ clipboard[0][0], clipboard[0][1] ] );
+        }
+      });
+
+      if ( clipboard[0][0] === 'text/plain' && typeof clipboard[0][1] === 'string' ) {
+        viewText.textContent = clipboard[0][1];
+        viewText.title = clipboard[0][1];
+        viewText.classList.add('view-text');
+      } else if ( clipboard[0][0] === 'text/html' && typeof clipboard[0][1] === 'string' ) {
+        let isNativeImage: boolean = false;
+        clipboard.forEach(clip => {
+          if ( clip[0].indexOf('image/') ) {
+            isNativeImage = true;
+          }
+        });
+
+        if ( isNativeImage ) {
+          viewText.innerHTML = clipboard[0][1];
+          viewText.title = '画像';
+          viewText.classList.add('view-img');
+        } else {
+          viewText.textContent = clipboard[0][1];
+          viewText.title = clipboard[0][1];
+          viewText.classList.add('view-text');
+        }
+      } else if ( clipboard[0][0].indexOf('image/') >= 0 ) {
+        const img = document.createElement('img');
+        img.alt = '画像';
+        img.src = clipboard[0][1];
+        viewText.appendChild( img );
+        viewText.classList.add('view-img');
+      }
+
+      li.appendChild( viewText );
+      operation.appendChild( copyButton );
+      li.appendChild( operation );
+      this.liveDom.__contentPanel.__history.recordList
+        ?.insertAdjacentElement('afterbegin', li);
     });
 
     this.liveDom.base.querySelector<HTMLDivElement>('main#insert-panel')!

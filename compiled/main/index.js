@@ -411,6 +411,9 @@ const CleePIX = {
         return true;
       }
     });
+    electron.ipcMain.on("clipboard-write", (_, writeData) => {
+      electron.clipboard.writeText(writeData[1], "clipboard");
+    });
     electron.ipcMain.on("feedreader-win-open", () => {
       if (!this.Windows.feedreader?.isVisible()) {
         this.Windows.feedreader?.show();
@@ -467,21 +470,21 @@ const CleePIX = {
         this.Windows.clipboard?.show();
       });
       this.Windows.clipboard.webContents.on("did-finish-load", () => {
-        let clipTmp = "";
+        let clipTmp = Buffer.from("");
         setInterval(() => {
           const formats = electron.clipboard.availableFormats();
           if (formats.length > 0) {
-            let clipdata = null;
+            let clipdata = Buffer.from("");
             if (formats[0].indexOf("text/plain") >= 0) {
-              clipdata = electron.clipboard.readText();
+              clipdata = Buffer.from(electron.clipboard.readText());
             } else if (formats[0].indexOf("text/html") >= 0) {
-              clipdata = electron.clipboard.readHTML();
+              clipdata = Buffer.from(electron.clipboard.readHTML());
             } else if (formats[0].indexOf("text/rtf") >= 0) {
-              clipdata = electron.clipboard.readRTF();
+              clipdata = Buffer.from(electron.clipboard.readRTF());
             } else if (formats[0].indexOf("image/") >= 0) {
-              clipdata = electron.clipboard.readImage();
+              clipdata = electron.clipboard.readImage().getBitmap();
             }
-            if (clipdata && clipdata != clipTmp) {
+            if (Buffer.compare(clipdata, clipTmp) !== 0) {
               clipTmp = clipdata;
               this.Windows.clipboard?.webContents.send("clipboard-update", [...formats.map((format) => {
                 if (format.indexOf("text/plain") >= 0) {
@@ -491,7 +494,7 @@ const CleePIX = {
                 } else if (format.indexOf("text/rtf") >= 0) {
                   return [format, electron.clipboard.readRTF()];
                 } else if (format.indexOf("image/") >= 0) {
-                  return [format, electron.clipboard.readImage()];
+                  return [format, electron.clipboard.readImage("clipboard").toDataURL()];
                 } else
                   return;
               })]);

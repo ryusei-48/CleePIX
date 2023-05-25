@@ -15,7 +15,7 @@ import axios from "axios";
 import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 import RssFeedParser from "rss-parser";
-import { windowInitValues, storeConfig } from "./index.d";
+import "./index.d";
 
 const APP_NAME = 'CleePIX';
 const USER_DATA_PATH = app.getPath('userData');
@@ -401,8 +401,12 @@ const CleePIX: {
       }
     });
 
+    ipcMain.on('clipboard-write', (_, writeData) => {
+      clipboard.writeText( writeData[1], 'clipboard' );
+    });
+
     // ##############################################
-    // クリップボードウィンドウ
+    // フィードリーダーウィンドウ
     // ##############################################
     ipcMain.on('feedreader-win-open', () => {
       if ( !this.Windows.feedreader?.isVisible() ) {
@@ -468,22 +472,22 @@ const CleePIX: {
 
       this.Windows.clipboard.webContents.on('did-finish-load', () => {
 
-        let clipTmp: string | Electron.NativeImage = '';
+        let clipTmp: Buffer = Buffer.from('');
         setInterval(() => {
           const formats = clipboard.availableFormats();
           if ( formats.length > 0 ) {
-            let clipdata: string | Electron.NativeImage | null = null;
+            let clipdata: Buffer = Buffer.from('');
             if ( formats[0].indexOf('text/plain') >= 0 ) {
-              clipdata = clipboard.readText();
+              clipdata = Buffer.from( clipboard.readText() );
             } else if ( formats[0].indexOf('text/html') >= 0 ) {
-              clipdata = clipboard.readHTML();
+              clipdata = Buffer.from( clipboard.readHTML() );
             } else if ( formats[0].indexOf('text/rtf') >= 0 ) {
-              clipdata = clipboard.readRTF();
+              clipdata = Buffer.from( clipboard.readRTF() );
             } else if ( formats[0].indexOf('image/') >= 0 ) {
-              clipdata = clipboard.readImage();
+              clipdata = clipboard.readImage().getBitmap();
             }
 
-            if ( clipdata && clipdata != clipTmp ) {
+            if ( Buffer.compare( clipdata, clipTmp ) !== 0 ) {
               clipTmp = clipdata;
               this.Windows.clipboard?.webContents
                 .send('clipboard-update', [...formats.map((format) => {
@@ -494,7 +498,7 @@ const CleePIX: {
                   } else if ( format.indexOf('text/rtf') >= 0 ) {
                     return [ format, clipboard.readRTF() ];
                   } else if ( format.indexOf('image/') >= 0 ) {
-                    return [ format, clipboard.readImage() ];
+                    return [ format, clipboard.readImage('clipboard').toDataURL() ];
                   } else return;
                 })]);
             }
