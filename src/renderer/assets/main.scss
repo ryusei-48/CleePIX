@@ -23,6 +23,8 @@ header {
       border: none;
       width: 100%;
       height: 100%;
+      padding-top: 1px;
+      transform: translateY( -1px );
       &:hover {
         background-color: rgb(113, 113, 113);
       }
@@ -41,6 +43,8 @@ header {
       border: none;
       width: 100%;
       height: 100%;
+      padding-top: 1px;
+      transform: translateY( -1px );
       &:hover {
         background-color: rgb(255, 32, 32);
       }

@@ -26,6 +26,7 @@
     "better-sqlite3-multiple-ciphers": "^8.1.0",
     "bookmark-file-parser": "^1.0.6",
     "cheerio": "^1.0.0-rc.12",
+    "clipboard-event": "^1.6.0",
     "electron-store": "^8.1.0",
     "file-type": "^18.2.1",
     "file-type-cjs-fix": "^1.1.1",

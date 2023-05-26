@@ -67,6 +67,7 @@ div.content-panel {
   flex-flow: column;
   height: 100%;;
   div.tab-labels {
+    position: relative;
     width: 100%;;
     letter-spacing: -1em;
     white-space: nowrap;
@@ -91,6 +92,20 @@ div.content-panel {
           background: rgba(83, 69, 51, 0.6);
         }
         &:hover + label {
+          backdrop-filter: blur(10px);
+          background: rgba(83, 69, 51, 0.6);
+        }
+      }
+    }
+    div.label.right {
+      position: absolute;
+      right: 10px; top: 60%;
+      transform: translateY( -50% );
+      button {
+        font-size: 17pt;
+        padding: 3px 8px;
+        transition: all .2s ease-in-out;
+        &:hover {
           backdrop-filter: blur(10px);
           background: rgba(83, 69, 51, 0.6);
         }

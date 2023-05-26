@@ -32,6 +32,7 @@ const axios = require("axios");
 const fileTypeCjsFix = require("file-type-cjs-fix");
 const bookmarkFileParser = require("bookmark-file-parser");
 const RssFeedParser = require("rss-parser");
+const clipboardLisner = require("clipboard-event");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -411,8 +412,35 @@ const CleePIX = {
         return true;
       }
     });
+    electron.ipcMain.handle("clipboard-read", () => {
+      const formats = electron.clipboard.availableFormats();
+      if (formats.length >= 0) {
+        return [...electron.clipboard.availableFormats().map((format) => {
+          if (format.indexOf("text/plain") >= 0) {
+            return [format, electron.clipboard.readText()];
+          } else if (format.indexOf("text/html") >= 0) {
+            return [format, electron.clipboard.readHTML()];
+          } else if (format.indexOf("text/rtf") >= 0) {
+            return [format, electron.clipboard.readRTF()];
+          } else if (format.indexOf("image/") >= 0) {
+            return [format, electron.clipboard.readImage("clipboard").toDataURL()];
+          } else
+            return;
+        })];
+      } else
+        return [];
+    });
     electron.ipcMain.on("clipboard-write", (_, writeData) => {
-      electron.clipboard.writeText(writeData[1], "clipboard");
+      if (writeData[0] === "text/plain") {
+        electron.clipboard.writeText(writeData[1], "clipboard");
+      } else if (writeData[0] === "text/html") {
+        electron.clipboard.writeHTML(writeData[1], "clipboard");
+      } else if (writeData[0] === "text/rtf") {
+        electron.clipboard.writeRTF(writeData[1], "clipboard");
+      } else if (writeData[0].indexOf("image/") >= 0) {
+        const image = electron.nativeImage.createFromDataURL(writeData[1]);
+        electron.clipboard.writeImage(image, "clipboard");
+      }
     });
     electron.ipcMain.on("feedreader-win-open", () => {
       if (!this.Windows.feedreader?.isVisible()) {
@@ -426,7 +454,7 @@ const CleePIX = {
       this.Windows.main?.on("ready-to-show", () => {
         this.Windows.main?.show();
       });
-      if (this.configTemp?.window.clipboard.isFixation) {
+      if (this.configTemp?.window?.clipboard.isFixation) {
         this.Windows.clipboard?.setAlwaysOnTop(true);
       }
       const tray = new electron.Tray(electron.nativeImage.createFromPath(appIcon));
@@ -470,37 +498,10 @@ const CleePIX = {
         this.Windows.clipboard?.show();
       });
       this.Windows.clipboard.webContents.on("did-finish-load", () => {
-        let clipTmp = Buffer.from("");
-        setInterval(() => {
-          const formats = electron.clipboard.availableFormats();
-          if (formats.length > 0) {
-            let clipdata = Buffer.from("");
-            if (formats[0].indexOf("text/plain") >= 0) {
-              clipdata = Buffer.from(electron.clipboard.readText());
-            } else if (formats[0].indexOf("text/html") >= 0) {
-              clipdata = Buffer.from(electron.clipboard.readHTML());
-            } else if (formats[0].indexOf("text/rtf") >= 0) {
-              clipdata = Buffer.from(electron.clipboard.readRTF());
-            } else if (formats[0].indexOf("image/") >= 0) {
-              clipdata = electron.clipboard.readImage().getBitmap();
-            }
-            if (Buffer.compare(clipdata, clipTmp) !== 0) {
-              clipTmp = clipdata;
-              this.Windows.clipboard?.webContents.send("clipboard-update", [...formats.map((format) => {
-                if (format.indexOf("text/plain") >= 0) {
-                  return [format, electron.clipboard.readText()];
-                } else if (format.indexOf("text/html") >= 0) {
-                  return [format, electron.clipboard.readHTML()];
-                } else if (format.indexOf("text/rtf") >= 0) {
-                  return [format, electron.clipboard.readRTF()];
-                } else if (format.indexOf("image/") >= 0) {
-                  return [format, electron.clipboard.readImage("clipboard").toDataURL()];
-                } else
-                  return;
-              })]);
-            }
-          }
-        }, 20);
+        clipboardLisner.startListening();
+        clipboardLisner.on("change", () => {
+          this.Windows.clipboard.webContents.send("clipboard-change");
+        });
       });
       electron.app.on("activate", () => {
         if (electron.BrowserWindow.getAllWindows().length === 0)
@@ -509,6 +510,7 @@ const CleePIX = {
     });
     electron.app.on("window-all-closed", () => {
       if (process.platform !== "darwin") {
+        clipboardLisner.stopListening();
         electron.globalShortcut.unregisterAll();
         electron.app.quit();
       }
@@ -747,7 +749,7 @@ const CleePIX = {
         webviewTag: true
       }
     });
-    if (mode === "main" && this.configTemp?.window.main.isMaximize)
+    if (mode === "main" && this.configTemp?.window?.main.isMaximize)
       window.maximize();
     window.on("moved", () => {
       const rect = window.getNormalBounds();

@@ -25,11 +25,12 @@ declare global {
     send( channel: 'clipboard-write', arg: [ String, string ] ): void;
 
     on(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): this;
-    on( channel: 'clipboard-update', listener: ( event: IpcRendererEvent, arg: [ string, string ][] ) => void ): IpcRenderer
+    //on( channel: 'clipboard-update', listener: ( event: IpcRendererEvent, arg: [ string, string ][] ) => void ): IpcRenderer
 
     invoke(channel: string, ...args: any[]): Promise<any>;
     invoke( channel: 'clipboard-win-show-top'): Promise<Boolean>;
     invoke( channel: 'get-config' ): Promise<storeConfig>;
+    invoke( channel: 'clipboard-read' ): Promise<[ string, string ][]>;
   }
 }
 

@@ -415,6 +415,9 @@ export const clipboard: {
           <input class="tab" type="radio" name="top-tab-label" value="tmp" id="tmp-tab-btn">
           <label role="button" tabindex="0" for="tmp-tab-btn">一時保存</label>
         </div>
+        <div class="label right">
+          <button data-is-show="false" title="保存されたクリップボードのプレビューを表示" id="toggle-preview-panel" aria-label="保存されたクリップボードのプレビューを表示"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>
+        </div>
       </div>
       <div class="tab-content">
         <div class="content history show">

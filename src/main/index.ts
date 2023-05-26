@@ -15,6 +15,7 @@ import axios from "axios";
 import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 import RssFeedParser from "rss-parser";
+import clipboardLisner from "clipboard-event";
 import "./index.d";
 
 const APP_NAME = 'CleePIX';
@@ -392,17 +393,43 @@ const CleePIX: {
     ipcMain.handle('clipboard-win-show-top', () => {
       if ( this.Windows.clipboard?.isAlwaysOnTop() ) {
         this.Windows.clipboard?.setAlwaysOnTop( false );
-        this.configTemp!.window.clipboard.isFixation = false;
+        this.configTemp!.window!.clipboard.isFixation = false;
         this.config.set('window', this.configTemp?.window); return false;
       } else {
         this.Windows.clipboard?.setAlwaysOnTop( true );
-        this.configTemp!.window.clipboard.isFixation = true;
-        this.config.set('window', this.configTemp?.window);return true;
+        this.configTemp!.window!.clipboard.isFixation = true;
+        this.config.set('window', this.configTemp?.window); return true;
       }
     });
 
+    ipcMain.handle('clipboard-read', () => {
+      const formats = clipboard.availableFormats();
+      if ( formats.length >= 0 ) {
+        return [...clipboard.availableFormats().map((format) => {
+          if ( format.indexOf('text/plain') >= 0 ) {
+            return [ format, clipboard.readText() ];
+          } else if ( format.indexOf('text/html') >= 0 ) {
+            return [ format, clipboard.readHTML() ];
+          } else if ( format.indexOf('text/rtf') >= 0 ) {
+            return [ format, clipboard.readRTF() ];
+          } else if ( format.indexOf('image/') >= 0 ) {
+            return [ format, clipboard.readImage('clipboard').toDataURL() ];
+          } else return;
+        })]
+      } else return [];
+    });
+
     ipcMain.on('clipboard-write', (_, writeData) => {
-      clipboard.writeText( writeData[1], 'clipboard' );
+      if ( writeData[0] === 'text/plain' ) {
+        clipboard.writeText( writeData[1], 'clipboard' );
+      } else if ( writeData[0] === 'text/html' ) {
+        clipboard.writeHTML( writeData[1], 'clipboard' );
+      } else if ( writeData[0] === 'text/rtf' ) {
+        clipboard.writeRTF( writeData[1], 'clipboard' );
+      } else if ( writeData[0].indexOf('image/') >= 0 ) {
+        const image =nativeImage.createFromDataURL( writeData[1] );
+        clipboard.writeImage( image, 'clipboard' );
+      }
     });
 
     // ##############################################
@@ -427,7 +454,7 @@ const CleePIX: {
         this.Windows.main?.show();
       });
 
-      if ( this.configTemp?.window.clipboard.isFixation ) {
+      if ( this.configTemp?.window?.clipboard.isFixation ) {
         this.Windows.clipboard?.setAlwaysOnTop( true );
       }
 
@@ -472,38 +499,10 @@ const CleePIX: {
 
       this.Windows.clipboard.webContents.on('did-finish-load', () => {
 
-        let clipTmp: Buffer = Buffer.from('');
-        setInterval(() => {
-          const formats = clipboard.availableFormats();
-          if ( formats.length > 0 ) {
-            let clipdata: Buffer = Buffer.from('');
-            if ( formats[0].indexOf('text/plain') >= 0 ) {
-              clipdata = Buffer.from( clipboard.readText() );
-            } else if ( formats[0].indexOf('text/html') >= 0 ) {
-              clipdata = Buffer.from( clipboard.readHTML() );
-            } else if ( formats[0].indexOf('text/rtf') >= 0 ) {
-              clipdata = Buffer.from( clipboard.readRTF() );
-            } else if ( formats[0].indexOf('image/') >= 0 ) {
-              clipdata = clipboard.readImage().getBitmap();
-            }
-
-            if ( Buffer.compare( clipdata, clipTmp ) !== 0 ) {
-              clipTmp = clipdata;
-              this.Windows.clipboard?.webContents
-                .send('clipboard-update', [...formats.map((format) => {
-                  if ( format.indexOf('text/plain') >= 0 ) {
-                    return [ format, clipboard.readText() ];
-                  } else if ( format.indexOf('text/html') >= 0 ) {
-                    return [ format, clipboard.readHTML() ];
-                  } else if ( format.indexOf('text/rtf') >= 0 ) {
-                    return [ format, clipboard.readRTF() ];
-                  } else if ( format.indexOf('image/') >= 0 ) {
-                    return [ format, clipboard.readImage('clipboard').toDataURL() ];
-                  } else return;
-                })]);
-            }
-          }
-        }, 20);
+        clipboardLisner.startListening();
+        clipboardLisner.on('change', () => {
+          this.Windows!.clipboard!.webContents.send('clipboard-change');
+        });
       });
 
       app.on('activate', () => {
@@ -518,6 +517,7 @@ const CleePIX: {
     // explicitly with Cmd + Q.
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
+        clipboardLisner.stopListening();
         globalShortcut.unregisterAll();
         app.quit()
       }
@@ -752,7 +752,7 @@ const CleePIX: {
 
   createWindowInstance: function ( mode ) {
 
-    const windowConfig = <windowInitValues>this.configTemp!.window[ mode ];
+    const windowConfig = <windowInitValues>this.configTemp!.window![ mode ];
 
     const window = new BrowserWindow({
       width: windowConfig.width, minWidth: windowConfig.minWidth,
@@ -769,23 +769,23 @@ const CleePIX: {
       }
     });
 
-    if ( mode === 'main' && this.configTemp?.window.main.isMaximize ) window.maximize();
+    if ( mode === 'main' && this.configTemp?.window?.main.isMaximize ) window.maximize();
 
     window.on('moved', () => {
       const rect = window.getNormalBounds();
-      this.configTemp!.window[ mode ].x = rect.x;
-      this.configTemp!.window[ mode ].y = rect.y;
-      this.config.set('window', this.configTemp!.window);
+      this.configTemp!.window![ mode ].x = rect.x;
+      this.configTemp!.window![ mode ].y = rect.y;
+      this.config.set('window', this.configTemp!.window!);
     });
 
     window.on('maximize', () => {
-      this.configTemp!.window[ mode ].isMaximize = true;
-      this.config.set('window', this.configTemp!.window);
+      this.configTemp!.window![ mode ].isMaximize = true;
+      this.config.set('window', this.configTemp!.window!);
     });
 
     window.on('unmaximize', () => {
-      this.configTemp!.window[ mode ].isMaximize = false;
-      this.config.set('window', this.configTemp!.window);
+      this.configTemp!.window![ mode ].isMaximize = false;
+      this.config.set('window', this.configTemp!.window!);
     });
 
     window.webContents.setWindowOpenHandler((details) => {
@@ -871,6 +871,15 @@ async function httpRequestString( url: string ): Promise<string | null> {
     }).then( ( response ) => {
       resolve( response.data );
     }).catch((err) => { console.log(err); resolve( null ) });
+  });
+}
+
+async function sleep( second: number ): Promise<void> {
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, second);
   });
 }
 

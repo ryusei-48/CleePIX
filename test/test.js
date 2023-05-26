@@ -16,10 +16,15 @@ readInterface.question("入力してください >",
     //console.log( `入力された文字：[${inputString }]`);
   });
 */
-const { fromStream } = require('file-type-cjs-fix');
-const { createReadStream } = require('fs');
 
-const file = createReadStream('url-request.js');
-fromStream(file).then((res) => {
-  console.log(res);
+const clipboardListener = require('clipboard-event');
+
+// To start listening
+clipboardListener.startListening();
+
+clipboardListener.on('change', () => {
+    console.log('Clipboard changed');
 });
+
+// To stop listening
+//clipboardListener.stopListening();
