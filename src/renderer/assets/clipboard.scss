@@ -11,7 +11,7 @@ header {
   .app-name {
     flex-basis: calc(100% - 160px);
     height: 100%;
-    padding: 4px;
+    padding: 0px 5px;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -115,65 +115,93 @@ div.content-panel {
   div.tab-content {
     flex-basis: 100%;
     flex: 1 0 auto;
-    position: relative;
-    > div.content {
-      position: absolute;
-      top: 0; left: 0;
+    @include flexbese( $jc: left );
+    > div.content-wrap {
+      flex-basis: 100%;
+      position: relative;
       width: 100%;
       height: 100%;
-      padding: 5px;
-      z-index: 1;
-      opacity: 0;
-      transition: opacity .3s ease-in-out;
-      overflow-y: auto;
-    }
-    > div.content.show {
-      opacity: 1;
-    }
-    > div.content.history {
-      > ul.record-list {
-        display: block;
+      > div.content {
+        position: absolute;
+        top: 0; left: 0;
         width: 100%;
+        height: 100%;
+        padding: 5px;
+        z-index: 1;
+        opacity: 0;
+        transition: opacity .3s ease-in-out;
         overflow-y: auto;
-        padding-right: 10px;
-        > li.record {
-          display: flex;
-          align-content: center;
+      }
+      > div.content.show {
+        opacity: 1;
+      }
+      > div.content.history {
+        > ul.record-list {
+          display: block;
           width: 100%;
-          //letter-spacing: -1em;
-          //white-space: nowrap;
-          margin: 7px 0;
-          background: rgba(69, 67, 64, 0.7);
-          backdrop-filter: blur(10px);
-          color: $text-color;
-          > span.view-text {
-            display: inline-block;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            overflow: hidden;
-            padding-left: 5px;
-            padding-right: 5px;
-            width: calc( 100% - 30px );
-          }
-          > span.view-img {
-            display: inline-block;
-            padding: 5px;
-            width: calc( 100% - 30px );
-            img {
-              width: 100%;
+          overflow-y: auto;
+          padding-right: 10px;
+          > li.record {
+            display: flex;
+            align-content: center;
+            width: 100%;
+            //letter-spacing: -1em;
+            //white-space: nowrap;
+            margin: 7px 0;
+            background: rgba(69, 67, 64, 0.7);
+            backdrop-filter: blur(10px);
+            color: $text-color;
+            transition: outline .3s ease-in-out;
+            > span.view-text {
+              display: inline-block;
+              white-space: nowrap;
+              text-overflow: ellipsis;
+              overflow: hidden;
+              padding-left: 5px;
+              padding-right: 5px;
+              width: calc( 100% - 30px );
+            }
+            > span.view-img {
+              display: inline-block;
+              padding: 5px;
+              width: calc( 100% - 30px );
+              img {
+                width: 100%;
+              }
+            }
+            > span.operation {
+              display: inline-block;
+              width: 30px;
+              text-align: center;
+              button.copy {
+                width: 100%;
+                height: 100%;;
+              }
             }
           }
-          > span.operation {
-            display: inline-block;
-            width: 30px;
-            text-align: center;
-            button.copy {
-              width: 100%;
-              height: 100%;;
-            }
+          li.record.click {
+            outline: solid;
           }
         }
       }
+    }
+    > div.content-wrap.resize {
+      flex-basis: 30%;
+    }
+    span.resize-bar {
+      display: none;
+      flex-basis: 4px;;
+      background-color: rgb(40, 40, 40);
+      cursor: col-resize;
+    }
+    div.preview-panel {
+      display: none;
+      flex-grow: 1;
+      flex-basis: 100px;;
+    }
+    span.resize-bar.show,
+    div.preview-panel.show {
+      display: inherit;
     }
   }
 }

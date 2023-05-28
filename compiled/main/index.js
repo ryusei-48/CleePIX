@@ -426,11 +426,20 @@ const CleePIX = {
             return [format, electron.clipboard.readImage("clipboard").toDataURL()];
           } else
             return;
+        }).filter((clip) => {
+          if (clip) {
+            if (clip[1] !== void 0)
+              return true;
+            else
+              return false;
+          } else
+            return false;
         })];
       } else
         return [];
     });
     electron.ipcMain.on("clipboard-write", (_, writeData) => {
+      electron.clipboard.clear("clipboard");
       if (writeData[0] === "text/plain") {
         electron.clipboard.writeText(writeData[1], "clipboard");
       } else if (writeData[0] === "text/html") {
@@ -440,6 +449,34 @@ const CleePIX = {
       } else if (writeData[0].indexOf("image/") >= 0) {
         const image = electron.nativeImage.createFromDataURL(writeData[1]);
         electron.clipboard.writeImage(image, "clipboard");
+      }
+    });
+    electron.ipcMain.on("clip-hist-copy", (_, hist) => {
+      const contextMenu = electron.Menu.buildFromTemplate(
+        [...hist.clips.map((clip) => {
+          return { label: clip[0], click: () => {
+            electron.clipboard.clear("clipboard");
+            if (clip[0] === "text/plain") {
+              electron.clipboard.writeText(clip[1], "clipboard");
+            } else if (clip[0] === "text/html") {
+              electron.clipboard.writeHTML(clip[1], "clipboard");
+            } else if (clip[0] === "text/rtf") {
+              electron.clipboard.writeRTF(clip[1], "clipboard");
+            } else if (clip[0].indexOf("image/") >= 0) {
+              electron.clipboard.writeImage(electron.nativeImage.createFromDataURL(clip[1]));
+            }
+          } };
+        })]
+      );
+      contextMenu.popup({ window: this.Windows.clipboard, x: hist.pos.x, y: hist.pos.y });
+    });
+    electron.ipcMain.on("resize-aspect16/9-win", (_, toggle) => {
+      if (toggle) {
+        const width = Math.floor(this.Windows.clipboard?.getBounds().height * 16 / 11);
+        this.Windows.clipboard?.setBounds({ width }, true);
+      } else {
+        const width = Math.floor(this.Windows.clipboard?.getBounds().height * 20 / 29);
+        this.Windows.clipboard?.setBounds({ width }, true);
       }
     });
     electron.ipcMain.on("feedreader-win-open", () => {

@@ -415,11 +415,16 @@ const CleePIX: {
           } else if ( format.indexOf('image/') >= 0 ) {
             return [ format, clipboard.readImage('clipboard').toDataURL() ];
           } else return;
+        }).filter((clip) => {
+          if ( clip ) {
+            if ( clip[1] !== undefined ) return true; else return false;
+          } else return false;
         })]
       } else return [];
     });
 
     ipcMain.on('clipboard-write', (_, writeData) => {
+      clipboard.clear('clipboard');
       if ( writeData[0] === 'text/plain' ) {
         clipboard.writeText( writeData[1], 'clipboard' );
       } else if ( writeData[0] === 'text/html' ) {
@@ -429,6 +434,37 @@ const CleePIX: {
       } else if ( writeData[0].indexOf('image/') >= 0 ) {
         const image =nativeImage.createFromDataURL( writeData[1] );
         clipboard.writeImage( image, 'clipboard' );
+      }
+    });
+
+    ipcMain.on('clip-hist-copy', (_, hist) => {
+      const contextMenu = Menu.buildFromTemplate(
+        [...hist.clips.map((clip) => {
+          return { label: clip[0], click: () => {
+            clipboard.clear('clipboard');
+            if ( clip[0] === 'text/plain' ) {
+              clipboard.writeText( clip[1], 'clipboard' );
+            } else if ( clip[0] === 'text/html' ) {
+              clipboard.writeHTML( clip[1], 'clipboard' );
+            } else if ( clip[0] === 'text/rtf' ) {
+              clipboard.writeRTF( clip[1], 'clipboard' );
+            } else if ( clip[0].indexOf('image/') >= 0 ) {
+              clipboard.writeImage( nativeImage.createFromDataURL( clip[1] ) );
+            }
+          }}
+        })]
+      );
+
+      contextMenu.popup({ window: this.Windows!.clipboard!, x: hist.pos.x, y: hist.pos.y });
+    });
+
+    ipcMain.on('resize-aspect16/9-win', (_, toggle) => {
+      if ( toggle ) {
+        const width = Math.floor( ( this.Windows.clipboard?.getBounds().height! * 16 ) / 11 );
+        this.Windows.clipboard?.setBounds( { width }, true );
+      } else {
+        const width = Math.floor( ( this.Windows.clipboard?.getBounds().height! * 20 ) / 29 );
+        this.Windows.clipboard?.setBounds( { width }, true );
       }
     });
 

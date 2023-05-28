@@ -81,16 +81,17 @@ export const clipboard: {
     [...this.liveDom.contentPanel.querySelectorAll<HTMLInputElement>('div.tab-labels input.tab')!]
       .forEach((tab) => {
         tab.addEventListener('click', () => {
-          const orldTabContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.content.show')!;
+          const orldTabContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content div.content.show')!;
           orldTabContent.classList.remove('show');
           orldTabContent.inert = true;
-          const activeTabContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>(`div.tab-content > div.${ tab.value }`)!;
+          const activeTabContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>(`div.tab-content div.${ tab.value }`)!;
           activeTabContent.classList.add('show');
           activeTabContent.inert = false;
         });
       });
 
     let oneStopEntryFlag: boolean = false;
+    let clickedLi: HTMLLIElement | null = null;
     let cliptmp: string = '';
     const clipboardLisner = async () => {
 
@@ -121,6 +122,19 @@ export const clipboard: {
         copyButton.addEventListener('click', () => {
           window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1] ]);
           oneStopEntryFlag = true;
+        });
+
+        li.addEventListener('contextmenu', (e) => {
+          window.electron.ipcRenderer.send('clip-hist-copy', { clips: clipboard, pos: { x: e.x, y: e.y } });
+        });
+
+        li.addEventListener('click', (e) => {
+          if ( clickedLi ) {
+            clickedLi.classList.remove('click');
+          }
+
+          (<HTMLLIElement>e.currentTarget).classList.add('click');
+          clickedLi = <HTMLLIElement>e.currentTarget
         });
 
         if ( clipboard[0][0] === 'text/plain' && typeof clipboard[0][1] === 'string' ) {
@@ -166,6 +180,10 @@ export const clipboard: {
       clipboardLisner();
     });
 
+    const resizePanelBar = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('span.resize-bar')!;
+    const clipContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.content-wrap')!;
+    const clipPreview = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.preview-panel')!;
+
     this.liveDom.contentPanel.querySelector<HTMLButtonElement>('#toggle-preview-panel')!
       .addEventListener('click', (e) => {
         e.stopPropagation();
@@ -174,12 +192,30 @@ export const clipboard: {
           (<HTMLButtonElement>e.currentTarget).title = "プレビューパネルを閉じる";
           (<HTMLButtonElement>e.currentTarget).ariaLabel = 'プレビューパネルを閉じる';
           (<HTMLButtonElement>e.currentTarget).dataset.isShow = 'true';
+          clipContent.classList.add('resize');
+          resizePanelBar.classList.add('show');
+          clipPreview.classList.add('show');
+          window.electron.ipcRenderer.send('resize-aspect16/9-win', true);
         } else {
           (<HTMLButtonElement>e.currentTarget).innerHTML = `<i class="fa-solid fa-arrow-right-to-bracket"></i>`;
           (<HTMLButtonElement>e.currentTarget).title = "保存されたクリップボードのプレビューを表示";
           (<HTMLButtonElement>e.currentTarget).ariaLabel = '保存されたクリップボードのプレビューを表示';
           (<HTMLButtonElement>e.currentTarget).dataset.isShow = 'false';
+          clipContent.classList.remove('resize');
+          resizePanelBar.classList.remove('show');
+          clipPreview.classList.remove('show');
+          window.electron.ipcRenderer.send('resize-aspect16/9-win', false);
         }
+      });
+
+      const panelResizing = (e: MouseEvent): void => {
+        clipContent.style.flexBasis = `${e.x}px`;
+      };
+      resizePanelBar.addEventListener('mousedown', () => {
+        document.addEventListener('mousemove', panelResizing, false);
+        document.addEventListener('mouseup', () => {
+          document.removeEventListener('mousemove', panelResizing, false);
+        }, false);
       });
 
     this.liveDom.base.querySelector<HTMLDivElement>('main#insert-panel')!

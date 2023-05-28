@@ -26,6 +26,8 @@ export declare global {
 
       on( channel: String, listener: ( event: IpcMainEvent, ...arg: any[] ) => void ): Electron.IpcMain;
       on( channel: 'clipboard-write', listener: ( event: IpcMainEvent, arg: [ String, string ] ) => void ): Electron.IpcMain;
+      on( channel: 'clip-hist-copy', listener: ( event: IpcMainEvent, arg: { pos: { x: number, y: number }, clips: [ string, string ][] } ) => void ): Electron.IpcMain;
+      on( channel: 'resize-aspect16/9-win', listener: ( event: IpcMainEvent, arg: boolean ) => void ): Electron.IpcMain;
     }
   }
 }

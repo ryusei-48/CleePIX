@@ -420,11 +420,15 @@ export const clipboard: {
         </div>
       </div>
       <div class="tab-content">
-        <div class="content history show">
-          <ul class="record-list"></ul>
+        <div class="content-wrap">
+          <div class="content history show">
+            <ul class="record-list"></ul>
+          </div>
+          <div class="content search" inert>いいいいいいいいいいいいい</div>
+          <div class="content tmp" inert>うううううううううううううう</div>
         </div>
-        <div class="content search" inert>いいいいいいいいいいいいい</div>
-        <div class="content tmp" inert>うううううううううううううう</div>
+        <span draggable="true" class="resize-bar"></span>
+        <div class="preview-panel">test</div>
       </div>
     `;
     return dom;
