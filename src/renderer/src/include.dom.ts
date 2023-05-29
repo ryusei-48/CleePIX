@@ -428,7 +428,31 @@ export const clipboard: {
           <div class="content tmp" inert>うううううううううううううう</div>
         </div>
         <span draggable="true" class="resize-bar"></span>
-        <div class="preview-panel">test</div>
+        <div class="preview-panel">
+          <div class="views">
+            <div class="view hide">
+              <span class="label">
+                <span class="clip-type">プレーンテキスト [text/plain]</span>
+                <button class="copy" id="preview-clip-text-copy"><i class="fa-solid fa-copy"></i> コピー</button>
+              </span>
+              <textarea readonly wrap="off" id="preview-clip-text"></textarea>
+            </div>
+            <div class="view hide">
+              <span class="label">
+                <span class="clip-type">書式付きテキスト [text/html][text/rtf]</span>
+                <button class="copy" id="preview-clip-html-copy"><i class="fa-solid fa-copy"></i> コピー</button>
+              </span>
+              <span class="preview-clip" id="preview-clip-html"></span>
+            </div>
+            <div class="view hide">
+              <span class="label">
+                <span class="clip-type">画像 [image/png]</span>
+                <button class="copy" id="preview-clip-image-copy"><i class="fa-solid fa-copy"></i> コピー</button>
+              </span>
+              <span class="preview-clip" id="preview-clip-image"></span>
+            </div>
+          </div>
+        </div>
       </div>
     `;
     return dom;

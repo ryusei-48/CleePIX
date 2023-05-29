@@ -3,7 +3,7 @@ import "animate.css";
 import "../../../node_modules/quill/dist/quill.snow.css";
 import { clipboard as includeDom } from "./include.dom";
 import "../../preload/index.d";
-import { URItoBlob } from "./functions";
+import { URItoBlob, textareaResizer } from "./functions";
 
 export const clipboard: {
 
@@ -15,6 +15,11 @@ export const clipboard: {
     __contentPanel: {
       history?: HTMLDivElement,
       __history: { recordList?: HTMLUListElement }
+    },
+    previewPanel?: HTMLDivElement,
+    __previewPanel: {
+      clipText?: HTMLTextAreaElement, clipHtml?: HTMLSpanElement,
+      clipImage?: HTMLSpanElement
     }
   }
 
@@ -22,7 +27,7 @@ export const clipboard: {
 
   liveDom: {
     base: includeDom.base(), contentPanel: includeDom.contentPanel(),
-    __contentPanel: { __history: {} }
+    __contentPanel: { __history: {} }, __previewPanel: {}
   },
 
   init: async function () {
@@ -78,6 +83,12 @@ export const clipboard: {
     this.liveDom.__contentPanel.history = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.content.history')!;
     this.liveDom.__contentPanel.__history.recordList = this.liveDom.__contentPanel.history.querySelector<HTMLUListElement>('ul.record-list')!;
 
+    this.liveDom.previewPanel = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.preview-panel')!;
+    this.liveDom.__previewPanel.clipText = this.liveDom.contentPanel.querySelector<HTMLTextAreaElement>('#preview-clip-text')!;
+    this.liveDom.__previewPanel.clipHtml = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-html')!;
+    this.liveDom.__previewPanel.clipImage = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-image')!;
+
+
     [...this.liveDom.contentPanel.querySelectorAll<HTMLInputElement>('div.tab-labels input.tab')!]
       .forEach((tab) => {
         tab.addEventListener('click', () => {
@@ -112,7 +123,7 @@ export const clipboard: {
         const viewText = document.createElement('span');
         const operation = document.createElement('span');
         const copyButton = document.createElement('button');
-        li.classList.add('record');
+        li.classList.add('record', 'animate__animated', 'animate__fadeInLeft');
         operation.classList.add('operation');
         copyButton.classList.add('copy');
         copyButton.title = 'クリップボードに送る';
@@ -135,6 +146,29 @@ export const clipboard: {
 
           (<HTMLLIElement>e.currentTarget).classList.add('click');
           clickedLi = <HTMLLIElement>e.currentTarget
+
+          Object.entries(this.liveDom.__previewPanel).forEach(view => {
+            (<HTMLDivElement>view[1].parentElement).classList.add('hide');
+          });
+
+          clipboard.forEach((clip) => {
+            if ( clip[0] === 'text/plain' ) {
+              this.liveDom.__previewPanel.clipText!.value = clip[1];
+              (<HTMLDivElement>this.liveDom.__previewPanel.clipText?.parentElement).classList.remove('hide');
+              textareaResizer( this.liveDom.__previewPanel.clipText! );
+            } else if ( clip[0] === 'text/html' ) {
+              this.liveDom.__previewPanel.clipHtml!.innerHTML = clip[1];
+              this.liveDom.__previewPanel.clipImage!.dataset.htmlSource = clip[1];
+              (<HTMLDivElement>this.liveDom.__previewPanel.clipHtml?.parentElement).classList.remove('hide');
+            } else if ( clip[0].indexOf('image/') >= 0 ) {
+              const image = document.createElement('img');
+              image.alt = '画像';
+              image.src = clip[1];
+              this.liveDom.__previewPanel.clipImage!.innerHTML = '';
+              this.liveDom.__previewPanel.clipImage!.append( image );
+              (<HTMLDivElement>this.liveDom.__previewPanel.clipImage?.parentElement).classList.remove('hide');
+            }
+          });
         });
 
         if ( clipboard[0][0] === 'text/plain' && typeof clipboard[0][1] === 'string' ) {
@@ -180,6 +214,22 @@ export const clipboard: {
       clipboardLisner();
     });
 
+    this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-text-copy')!
+      .addEventListener('click', () => {
+        window.electron.ipcRenderer.send('clipboard-write', [ 'text/plain', this.liveDom.__previewPanel.clipText?.value!, false ]);
+      });
+
+    this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-html-copy')!
+      .addEventListener('click', () => {
+        window.electron.ipcRenderer.send('clipboard-write', [ 'text/html', this.liveDom.__previewPanel.clipHtml?.innerHTML! ]);
+      });
+
+    this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-image-copy')!
+      .addEventListener('click', () => {
+        const dataURI = (<HTMLImageElement>this.liveDom.__previewPanel.clipImage!.childNodes[0]).src;
+        window.electron.ipcRenderer.send('clipboard-write', [ 'image/png', dataURI ]);
+      });
+
     const resizePanelBar = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('span.resize-bar')!;
     const clipContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.content-wrap')!;
     const clipPreview = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.preview-panel')!;
@@ -202,6 +252,7 @@ export const clipboard: {
           (<HTMLButtonElement>e.currentTarget).ariaLabel = '保存されたクリップボードのプレビューを表示';
           (<HTMLButtonElement>e.currentTarget).dataset.isShow = 'false';
           clipContent.classList.remove('resize');
+          clipContent.style.removeProperty('flex-basis');
           resizePanelBar.classList.remove('show');
           clipPreview.classList.remove('show');
           window.electron.ipcRenderer.send('resize-aspect16/9-win', false);

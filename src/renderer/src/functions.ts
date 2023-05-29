@@ -9,3 +9,8 @@ export function URItoBlob(dataURI: string): Blob {
   }
   return new Blob( [buffer], { type: mimeType });
 }
+
+export function textareaResizer( textarea: HTMLTextAreaElement ): void {
+  textarea.style.height = '0';
+  textarea.style.height = (textarea.scrollHeight + 10) + "px";
+}

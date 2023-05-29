@@ -909,7 +909,7 @@ async function httpRequestString( url: string ): Promise<string | null> {
     }).catch((err) => { console.log(err); resolve( null ) });
   });
 }
-
+/*
 async function sleep( second: number ): Promise<void> {
 
   return new Promise((resolve) => {
@@ -918,6 +918,6 @@ async function sleep( second: number ): Promise<void> {
     }, second);
   });
 }
-
+*/
 // App init
 CleePIX.run();

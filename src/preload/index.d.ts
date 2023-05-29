@@ -23,7 +23,7 @@ declare global {
     send( channel: 'window-minize', arg: 'main' | 'clipboard' | 'feedreader' ): void;
     send( channel: 'window-hide', arg: 'main' | 'clipboard' | 'feedreader' ): void;
     send( channel: 'clip-hist-copy', arg: { pos: { x: number, y: number }, clips: [ string, string ][] } ): void;
-    send( channel: 'clipboard-write', arg: [ String, string ] ): void;
+    send( channel: 'clipboard-write', arg: [ string, string ] ): void;
     send( channel: 'resize-aspect16/9-win', arg: boolean ): void;
 
     on(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): this;
