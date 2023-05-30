@@ -33,6 +33,7 @@ declare global {
     invoke( channel: 'clipboard-win-show-top'): Promise<Boolean>;
     invoke( channel: 'get-config' ): Promise<storeConfig>;
     invoke( channel: 'clipboard-read' ): Promise<[ string, string ][]>;
+    invoke( channel: 'get-clipboard-historys', offset: number ): Promise<{ id: number, text: string, html: string, rtf: string, image: string, register_time: string }[]>;
   }
 }
 

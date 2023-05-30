@@ -157,6 +157,8 @@ div.content-panel {
             background: rgba(69, 67, 64, 0.7);
             backdrop-filter: blur(10px);
             color: $text-color;
+            user-select: none;
+            cursor: default;
             transition: outline .3s ease-in-out;
             &:hover {
               outline: 2px solid;
@@ -221,7 +223,7 @@ div.content-panel {
         > .view {
           width: 100%;
           height: auto;
-          margine: 5px auto;
+          margin: 5px auto;
           > textarea {
             width: 100%;
             font-size: 14pt;

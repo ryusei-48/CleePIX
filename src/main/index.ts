@@ -1,6 +1,6 @@
 import {
   app, shell, BrowserWindow, ipcMain, nativeTheme, Menu, Tray, nativeImage,
-  clipboard, globalShortcut
+  clipboard, globalShortcut, IpcMainEvent
 } from 'electron';
 import Store from 'electron-store';
 import { join } from 'path'
@@ -29,10 +29,15 @@ const CleePIX: {
     forScreenshot: BrowserWindow | null,
     feedreader: BrowserWindow | null, clipboard: BrowserWindow | null
   },
-  storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Database;};};},
+  extraStorage: { db?: Database.Database, stmt: {
+    insertHistory?: Database.Statement, selectHistoryFirst?: Database.Statement
+    insertHistorySaved?: Database.Statement
+  } },
+  storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Statement }}},
   config: Store<storeConfig>, configTemp?: storeConfig,
-  run: () => void, initializeDB: (storage: {label: string, id: number, path: string;}) => void,
+  run: () => void, initializeDB: (storage: {label: string, id: number, path: string }) => void,
   createWindowInstance: ( mode: 'main' | 'feedreader' | 'clipboard' ) => BrowserWindow,
+  initializeExtraDB: () => void,
   shareParts: {
     getInstanceDatabasePath: ( instanceId: number ) => string | null,
     getWebpageMetadata: ( url: string, isStatic?: boolean ) => Promise<{
@@ -46,7 +51,7 @@ const CleePIX: {
 
   Windows: {
     forScraping: null, forScreenshot: null, feedreader: null, clipboard: null,
-  }, storage: {},
+  }, storage: {}, extraStorage: { stmt: {} },
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
   run: function () {
@@ -78,8 +83,10 @@ const CleePIX: {
     this.configTemp = this.config.store;
 
     this.config.store.instance!.forEach(db => {
-      this.initializeDB(db);
+      this.initializeDB( db );
     });
+
+    this.initializeExtraDB();
 
     this.config.onDidAnyChange(() => {
       this.Windows.main?.webContents.send('config-update', this.config.store);
@@ -175,6 +182,9 @@ const CleePIX: {
       Object.values(this.storage).forEach(value => {
         value.db?.close();
       });
+      this.extraStorage.db?.close();
+      clipboardLisner.stopListening();
+      globalShortcut.unregisterAll();
       app.quit();
     });
 
@@ -384,6 +394,30 @@ const CleePIX: {
     // ##############################################
     // クリップボードウィンドウ
     // ##############################################
+    const insertClipFunc = ( clip: [ string, string ][], mode: number = 0 ) => {
+
+      const insertClips: {
+        text: string | null, html: string | null, rtf: string | null, image: string | null
+      } = { text: null, html: null, rtf: null, image: null }
+      clip.forEach((type) => {
+        if ( type[0] === 'text/plain' ) insertClips.text = type[1];
+        else if ( type[0] === 'text/html' ) insertClips.html = type[1];
+        else if ( type[0] === 'text/rtf' ) insertClips.rtf = type[1];
+        else if ( type[0].indexOf('image/') >= 0 ) insertClips.image = type[1];
+      });
+
+      switch ( mode ) {
+        case 0:
+          this.extraStorage.stmt.insertHistory?.run(
+            insertClips.text, insertClips.html, insertClips.rtf, insertClips.image
+          ); break;
+        case 1:
+          this.extraStorage.stmt.insertHistorySaved?.run(
+            insertClips.text, insertClips.html, insertClips.rtf, insertClips.image
+          ); break;
+      }
+    }
+
     ipcMain.on('clipboard-win-open', () => {
       if ( !this.Windows.clipboard?.isVisible() ) {
         this.Windows.clipboard?.show();
@@ -440,7 +474,7 @@ const CleePIX: {
     ipcMain.on('clip-hist-copy', (_, hist) => {
       const contextMenu = Menu.buildFromTemplate(
         [...hist.clips.map((clip) => {
-          return { label: clip[0], click: () => {
+          return { label: `コピー [${clip[0]}]`, click: () => {
             clipboard.clear('clipboard');
             if ( clip[0] === 'text/plain' ) {
               clipboard.writeText( clip[1], 'clipboard' );
@@ -452,7 +486,7 @@ const CleePIX: {
               clipboard.writeImage( nativeImage.createFromDataURL( clip[1] ) );
             }
           }}
-        })]
+        }), ...[ { label: '一時保存', click: () => insertClipFunc( hist.clips, 1 ) } ]]
       );
 
       contextMenu.popup({ window: this.Windows!.clipboard!, x: hist.pos.x, y: hist.pos.y });
@@ -466,6 +500,12 @@ const CleePIX: {
         const width = Math.floor( ( this.Windows.clipboard?.getBounds().height! * 20 ) / 29 );
         this.Windows.clipboard?.setBounds( { width }, true );
       }
+    });
+
+    ipcMain.on('clipboard-insert-db', (_, hist) => insertClipFunc( hist ));
+
+    ipcMain.handle('get-clipboard-historys', (_, offset) => {
+      return this.extraStorage.stmt.selectHistoryFirst?.all( offset, 60 );
     });
 
     // ##############################################
@@ -541,23 +581,22 @@ const CleePIX: {
         });
       });
 
-      app.on('activate', () => {
+      /*app.on('activate', () => {
         // On macOS it's common to re-create a window in the app when the
         // dock icon is clicked and there are no other windows open.
         if (BrowserWindow.getAllWindows().length === 0) CleePIX.createWindowInstance('main');
-      });
+      });*/
     });
 
     // Quit when all windows are closed, except on macOS. There, it's common
     // for applications and their menu bar to stay active until the user quits
     // explicitly with Cmd + Q.
-    app.on('window-all-closed', () => {
+    /*app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
-        clipboardLisner.stopListening();
         globalShortcut.unregisterAll();
         app.quit()
       }
-    });
+    });*/
   },
 
   shareParts: {
@@ -778,12 +817,52 @@ const CleePIX: {
       fs.mkdirSync(USER_DATA_PATH + '/storage');
     }
 
-    if (!fs.existsSync(STORAGE_PATH)) {
-      fs.mkdir(STORAGE_PATH, (err) => {
-        if (err === null) {initDB();}
+    if ( !fs.existsSync( STORAGE_PATH )) {
+      fs.mkdir( STORAGE_PATH, (err) => {
+        if ( err === null ) { initDB() }
       });
     } else initDB();
 
+  },
+
+  initializeExtraDB: function () {
+
+    if ( fs.existsSync( STORAGE_PATH + '/extra_data.db' ) ) {
+      this.extraStorage.db = new Database( STORAGE_PATH + '/extra_data.db' );
+    } else {
+      this.extraStorage.db = new Database( STORAGE_PATH + '/extra_data.db' );
+      //this.storage.main.db.pragma(`cipher='aes256cbc'`);
+      //this.storage.main.pragma("key='ymzkrk33'");
+      this.extraStorage.db.pragma('journal_mode = WAL');
+
+      this.extraStorage.db.prepare(
+        `CREATE TABLE "clipboard_history" (
+          "id" INTEGER UNIQUE, "text" TEXT, "html" TEXT, "rtf" TEXT,
+          "image" TEXT, "register_time" TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
+      ).run();
+
+      this.extraStorage.db.prepare(
+        `CREATE TABLE "clipboard_saved" (
+          "id" INTEGER UNIQUE, "text" TEXT, "html" TEXT, "rtf" TEXT,
+          "image" TEXT, "register_time" TIMESTAMP NOT NULL DEFAULT (DATETIME('now','localtime')),
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
+      ).run();
+    }
+
+    this.extraStorage.stmt.insertHistory = this.extraStorage.db.prepare(
+      `INSERT INTO clipboard_history ( text, html, rtf, image ) VALUES ( ?, ?, ?, ? )`
+    );
+
+    this.extraStorage.stmt.insertHistorySaved = this.extraStorage.db.prepare(
+      `INSERT INTO clipboard_saved ( text, html, rtf, image ) VALUES ( ?, ?, ?, ? )`
+    );
+
+    this.extraStorage.stmt.selectHistoryFirst = this.extraStorage.db.prepare(
+      `SELECT * FROM clipboard_history ORDER BY register_time ASC LIMIT ?, ?`
+    );
   },
 
   createWindowInstance: function ( mode ) {

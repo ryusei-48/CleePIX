@@ -88,7 +88,6 @@ export const clipboard: {
     this.liveDom.__previewPanel.clipHtml = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-html')!;
     this.liveDom.__previewPanel.clipImage = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-image')!;
 
-
     [...this.liveDom.contentPanel.querySelectorAll<HTMLInputElement>('div.tab-labels input.tab')!]
       .forEach((tab) => {
         tab.addEventListener('click', () => {
@@ -104,6 +103,124 @@ export const clipboard: {
     let oneStopEntryFlag: boolean = false;
     let clickedLi: HTMLLIElement | null = null;
     let cliptmp: string = '';
+
+    const viewHistoryRecord = ( clipboard: [ string, string ][] ) => {
+
+      const li = document.createElement('li');
+      const viewText = document.createElement('span');
+      const operation = document.createElement('span');
+      const copyButton = document.createElement('button');
+      li.tabIndex = 0;
+      li.classList.add('record', 'animate__animated', 'animate__fadeInLeft');
+      operation.classList.add('operation');
+      copyButton.classList.add('copy');
+      copyButton.title = 'クリップボードに送る';
+      copyButton.ariaLabel = 'クリップボードに送る';
+      copyButton.innerHTML = `<i class="fa-solid fa-copy"></i>`;
+
+      copyButton.addEventListener('click', () => {
+        window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1] ]);
+        oneStopEntryFlag = true;
+      });
+
+      li.addEventListener('contextmenu', (e) => {
+        window.electron.ipcRenderer.send('clip-hist-copy', { clips: clipboard, pos: { x: e.x, y: e.y } });
+      });
+
+      li.addEventListener('dblclick', (e) => {
+        this.liveDom.contentPanel.querySelector<HTMLButtonElement>('#toggle-preview-panel')!.click();
+        (<HTMLLIElement>e.currentTarget).click();
+      });
+
+      li.addEventListener('click', (e) => {
+        if ( clickedLi ) {
+          clickedLi.classList.remove('click');
+        }
+
+        (<HTMLLIElement>e.currentTarget).classList.add('click');
+        clickedLi = <HTMLLIElement>e.currentTarget
+
+        Object.entries(this.liveDom.__previewPanel).forEach(view => {
+          (<HTMLDivElement>view[1].parentElement).classList.add('hide');
+        });
+
+        clipboard.forEach((clip) => {
+          if ( clip[0] === 'text/plain' ) {
+            this.liveDom.__previewPanel.clipText!.value = clip[1];
+            (<HTMLDivElement>this.liveDom.__previewPanel.clipText?.parentElement).classList.remove('hide');
+            textareaResizer( this.liveDom.__previewPanel.clipText! );
+          } else if ( clip[0] === 'text/html' ) {
+            this.liveDom.__previewPanel.clipHtml!.innerHTML = clip[1];
+            this.liveDom.__previewPanel.clipImage!.dataset.htmlSource = clip[1];
+            (<HTMLDivElement>this.liveDom.__previewPanel.clipHtml?.parentElement).classList.remove('hide');
+          } else if ( clip[0].indexOf('image/') >= 0 ) {
+            const image = document.createElement('img');
+            image.alt = '画像';
+            image.src = clip[1];
+            this.liveDom.__previewPanel.clipImage!.innerHTML = '';
+            this.liveDom.__previewPanel.clipImage!.append( image );
+            (<HTMLDivElement>this.liveDom.__previewPanel.clipImage?.parentElement).classList.remove('hide');
+          }
+        });
+      });
+
+      if ( clipboard[0][0] === 'text/plain' && typeof clipboard[0][1] === 'string' ) {
+        viewText.textContent = clipboard[0][1];
+        viewText.title = clipboard[0][1];
+        viewText.classList.add('view-text');
+      } else if ( clipboard[0][0] === 'text/html' && typeof clipboard[0][1] === 'string' ) {
+        let isNativeImage: boolean = false;
+        clipboard.forEach(clip => {
+          if ( clip[0].indexOf('image/') ) {
+            isNativeImage = true;
+          }
+        });
+
+        if ( isNativeImage ) {
+          viewText.innerHTML = clipboard[0][1];
+          viewText.title = '画像';
+          viewText.classList.add('view-img');
+        } else {
+          viewText.textContent = clipboard[0][1];
+          viewText.title = clipboard[0][1];
+          viewText.classList.add('view-text');
+        }
+      } else if ( clipboard[0][0].indexOf('image/') >= 0 ) {
+        const img = document.createElement('img');
+        img.alt = '画像';
+        img.src = window.URL.createObjectURL( URItoBlob( clipboard[0][1] ) );
+        viewText.appendChild( img );
+        viewText.classList.add('view-img');
+      }
+
+      li.appendChild( viewText );
+      operation.appendChild( copyButton );
+      li.appendChild( operation );
+      this.liveDom.__contentPanel.__history.recordList?.insertAdjacentElement('afterbegin', li);
+    }
+
+    window.electron.ipcRenderer.invoke('get-clipboard-historys', 0 )
+      .then((historys) => {
+        if ( historys.length > 0 ) {
+          historys.forEach((hist) => {
+            const clipboard: [ string, string ][] = []
+            for ( let [ type, data ] of Object.entries(hist) ) {
+              if ( type === 'text' && typeof data === 'string' ) {
+                clipboard.push([ 'text/plain', data ]);
+              } else if ( type === 'html' && typeof data === 'string' ) {
+                clipboard.push([ 'text/html', data ]);
+              } else if ( type === 'rtf' && typeof data === 'string' ) {
+                clipboard.push([ 'text/rtf', data ]);
+              } else if ( type === 'image' && typeof data === 'string' ) {
+                clipboard.push([ 'image/png', data ]);
+              }
+            }
+
+            viewHistoryRecord( clipboard );
+          });
+        }
+      });
+
     const clipboardLisner = async () => {
 
       new Promise<void>( async (resolve) => {
@@ -116,95 +233,13 @@ export const clipboard: {
 
         if ( clipboard.length === 0 ) { resolve(); return; }
         if ( cliptmp === clipboard[0][1] ) { resolve(); return; }
+        if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { resolve(); return; }
         else cliptmp = clipboard[0][1];
-        console.log(clipboard);
+        //console.log(clipboard);
 
-        const li = document.createElement('li');
-        const viewText = document.createElement('span');
-        const operation = document.createElement('span');
-        const copyButton = document.createElement('button');
-        li.classList.add('record', 'animate__animated', 'animate__fadeInLeft');
-        operation.classList.add('operation');
-        copyButton.classList.add('copy');
-        copyButton.title = 'クリップボードに送る';
-        copyButton.ariaLabel = 'クリップボードに送る';
-        copyButton.innerHTML = `<i class="fa-solid fa-copy"></i>`;
+        window.electron.ipcRenderer.send('clipboard-insert-db', clipboard);
 
-        copyButton.addEventListener('click', () => {
-          window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1] ]);
-          oneStopEntryFlag = true;
-        });
-
-        li.addEventListener('contextmenu', (e) => {
-          window.electron.ipcRenderer.send('clip-hist-copy', { clips: clipboard, pos: { x: e.x, y: e.y } });
-        });
-
-        li.addEventListener('click', (e) => {
-          if ( clickedLi ) {
-            clickedLi.classList.remove('click');
-          }
-
-          (<HTMLLIElement>e.currentTarget).classList.add('click');
-          clickedLi = <HTMLLIElement>e.currentTarget
-
-          Object.entries(this.liveDom.__previewPanel).forEach(view => {
-            (<HTMLDivElement>view[1].parentElement).classList.add('hide');
-          });
-
-          clipboard.forEach((clip) => {
-            if ( clip[0] === 'text/plain' ) {
-              this.liveDom.__previewPanel.clipText!.value = clip[1];
-              (<HTMLDivElement>this.liveDom.__previewPanel.clipText?.parentElement).classList.remove('hide');
-              textareaResizer( this.liveDom.__previewPanel.clipText! );
-            } else if ( clip[0] === 'text/html' ) {
-              this.liveDom.__previewPanel.clipHtml!.innerHTML = clip[1];
-              this.liveDom.__previewPanel.clipImage!.dataset.htmlSource = clip[1];
-              (<HTMLDivElement>this.liveDom.__previewPanel.clipHtml?.parentElement).classList.remove('hide');
-            } else if ( clip[0].indexOf('image/') >= 0 ) {
-              const image = document.createElement('img');
-              image.alt = '画像';
-              image.src = clip[1];
-              this.liveDom.__previewPanel.clipImage!.innerHTML = '';
-              this.liveDom.__previewPanel.clipImage!.append( image );
-              (<HTMLDivElement>this.liveDom.__previewPanel.clipImage?.parentElement).classList.remove('hide');
-            }
-          });
-        });
-
-        if ( clipboard[0][0] === 'text/plain' && typeof clipboard[0][1] === 'string' ) {
-          viewText.textContent = clipboard[0][1];
-          viewText.title = clipboard[0][1];
-          viewText.classList.add('view-text');
-        } else if ( clipboard[0][0] === 'text/html' && typeof clipboard[0][1] === 'string' ) {
-          let isNativeImage: boolean = false;
-          clipboard.forEach(clip => {
-            if ( clip[0].indexOf('image/') ) {
-              isNativeImage = true;
-            }
-          });
-
-          if ( isNativeImage ) {
-            viewText.innerHTML = clipboard[0][1];
-            viewText.title = '画像';
-            viewText.classList.add('view-img');
-          } else {
-            viewText.textContent = clipboard[0][1];
-            viewText.title = clipboard[0][1];
-            viewText.classList.add('view-text');
-          }
-        } else if ( clipboard[0][0].indexOf('image/') >= 0 ) {
-          const img = document.createElement('img');
-          img.alt = '画像';
-          img.src = window.URL.createObjectURL( URItoBlob( clipboard[0][1] ) );
-          viewText.appendChild( img );
-          viewText.classList.add('view-img');
-        }
-
-        li.appendChild( viewText );
-        operation.appendChild( copyButton );
-        li.appendChild( operation );
-        this.liveDom.__contentPanel.__history.recordList
-          ?.insertAdjacentElement('afterbegin', li);
+        viewHistoryRecord( clipboard );
 
         resolve();
       })
