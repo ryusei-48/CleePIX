@@ -13,8 +13,10 @@ export const clipboard: {
   liveDom: {
     base: HTMLDivElement, contentPanel: HTMLDivElement,
     __contentPanel: {
-      history?: HTMLDivElement,
-      __history: { recordList?: HTMLUListElement }
+      history?: HTMLDivElement, search?: HTMLDivElement, tmp?: HTMLDivElement,
+      __history: { recordList?: HTMLUListElement },
+      __search: { recordList?: HTMLUListElement },
+      __tmp: { recordList?: HTMLUListElement }
     },
     previewPanel?: HTMLDivElement,
     __previewPanel: {
@@ -27,7 +29,7 @@ export const clipboard: {
 
   liveDom: {
     base: includeDom.base(), contentPanel: includeDom.contentPanel(),
-    __contentPanel: { __history: {} }, __previewPanel: {}
+    __contentPanel: { __history: {}, __search: {}, __tmp: {} }, __previewPanel: {}
   },
 
   init: async function () {
@@ -82,11 +84,27 @@ export const clipboard: {
 
     this.liveDom.__contentPanel.history = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.content.history')!;
     this.liveDom.__contentPanel.__history.recordList = this.liveDom.__contentPanel.history.querySelector<HTMLUListElement>('ul.record-list')!;
+    this.liveDom.__contentPanel.search = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.content.search')!;
+    this.liveDom.__contentPanel.__search.recordList = this.liveDom.__contentPanel.search.querySelector<HTMLUListElement>('ul.record-list')!;
+    this.liveDom.__contentPanel.tmp = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.content.tmp')!;
+    this.liveDom.__contentPanel.__tmp.recordList = this.liveDom.__contentPanel.tmp.querySelector<HTMLUListElement>('ul.record-list')!;
 
     this.liveDom.previewPanel = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.preview-panel')!;
     this.liveDom.__previewPanel.clipText = this.liveDom.contentPanel.querySelector<HTMLTextAreaElement>('#preview-clip-text')!;
     this.liveDom.__previewPanel.clipHtml = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-html')!;
     this.liveDom.__previewPanel.clipImage = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-image')!;
+
+    let clickedLi: { history?: HTMLLIElement, search?: HTMLLIElement, tmp?: HTMLLIElement } = {};
+    const noDataRecordHistory = this.liveDom.__contentPanel.__history.recordList.querySelector<HTMLLIElement>('li.no-data-record')!;
+    const noDataRecordSearch = this.liveDom.__contentPanel.__search.recordList.querySelector<HTMLLIElement>('li.no-data-record')!;
+    const noDataRecordTmp = this.liveDom.__contentPanel.__tmp.recordList.querySelector<HTMLLIElement>('li.no-data-record')!;
+
+    const viewPartsHide = () => {
+      Object.entries(this.liveDom.__previewPanel).forEach(view => {
+        (<HTMLDivElement>view[1].parentElement).classList.add('hide');
+        (<HTMLDivElement>view[1].parentElement).inert = true;
+      });
+    }
 
     [...this.liveDom.contentPanel.querySelectorAll<HTMLInputElement>('div.tab-labels input.tab')!]
       .forEach((tab) => {
@@ -97,14 +115,20 @@ export const clipboard: {
           const activeTabContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>(`div.tab-content div.${ tab.value }`)!;
           activeTabContent.classList.add('show');
           activeTabContent.inert = false;
+
+          if ( tab.value === 'history' && clickedLi.history ) {
+            clickedLi.history.click();
+          } else if ( tab.value === 'search' && clickedLi.search ) {
+            clickedLi.search.click();
+          } else if ( tab.value === 'tmp' && clickedLi.tmp ) {
+            clickedLi.tmp.click();
+          } else viewPartsHide();
         });
       });
 
-    let oneStopEntryFlag: boolean = false;
-    let clickedLi: HTMLLIElement | null = null;
     let cliptmp: string = '';
 
-    const viewHistoryRecord = ( clipboard: [ string, string ][] ) => {
+    const viewHistoryRecord = ( clipboard: [ string, string ][], tab: 'history' | 'search' | 'tmp' ) => {
 
       const li = document.createElement('li');
       const viewText = document.createElement('span');
@@ -119,12 +143,13 @@ export const clipboard: {
       copyButton.innerHTML = `<i class="fa-solid fa-copy"></i>`;
 
       copyButton.addEventListener('click', () => {
-        window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1] ]);
-        oneStopEntryFlag = true;
+        window.electron.ipcRenderer.invoke('update-clipboard-write-time').then(() => {
+          window.electron.ipcRenderer.send('clipboard-write', [ clipboard[0][0], clipboard[0][1] ]);
+        });
       });
 
       li.addEventListener('contextmenu', (e) => {
-        window.electron.ipcRenderer.send('clip-hist-copy', { clips: clipboard, pos: { x: e.x, y: e.y } });
+        window.electron.ipcRenderer.send('clip-hist-copy', { clips: clipboard, pos: { x: e.x, y: e.y }, type: tab });
       });
 
       li.addEventListener('dblclick', (e) => {
@@ -133,26 +158,31 @@ export const clipboard: {
       });
 
       li.addEventListener('click', (e) => {
-        if ( clickedLi ) {
-          clickedLi.classList.remove('click');
+
+        if ( tab === 'history' && clickedLi.history ) {
+          clickedLi.history.classList.remove('click');
+        } else if ( tab === 'search' && clickedLi.search ) {
+          clickedLi.search.classList.remove('click');
+        } else if ( tab === 'tmp' && clickedLi.tmp ) {
+          clickedLi.tmp.classList.remove('click');
         }
 
         (<HTMLLIElement>e.currentTarget).classList.add('click');
-        clickedLi = <HTMLLIElement>e.currentTarget
+        clickedLi[ tab ] = <HTMLLIElement>e.currentTarget;
 
-        Object.entries(this.liveDom.__previewPanel).forEach(view => {
-          (<HTMLDivElement>view[1].parentElement).classList.add('hide');
-        });
+        viewPartsHide();
 
         clipboard.forEach((clip) => {
           if ( clip[0] === 'text/plain' ) {
             this.liveDom.__previewPanel.clipText!.value = clip[1];
             (<HTMLDivElement>this.liveDom.__previewPanel.clipText?.parentElement).classList.remove('hide');
+            (<HTMLDivElement>this.liveDom.__previewPanel.clipText?.parentElement).inert = false;
             textareaResizer( this.liveDom.__previewPanel.clipText! );
           } else if ( clip[0] === 'text/html' ) {
             this.liveDom.__previewPanel.clipHtml!.innerHTML = clip[1];
             this.liveDom.__previewPanel.clipImage!.dataset.htmlSource = clip[1];
             (<HTMLDivElement>this.liveDom.__previewPanel.clipHtml?.parentElement).classList.remove('hide');
+            (<HTMLDivElement>this.liveDom.__previewPanel.clipHtml?.parentElement).inert = false;
           } else if ( clip[0].indexOf('image/') >= 0 ) {
             const image = document.createElement('img');
             image.alt = '画像';
@@ -160,6 +190,7 @@ export const clipboard: {
             this.liveDom.__previewPanel.clipImage!.innerHTML = '';
             this.liveDom.__previewPanel.clipImage!.append( image );
             (<HTMLDivElement>this.liveDom.__previewPanel.clipImage?.parentElement).classList.remove('hide');
+            (<HTMLDivElement>this.liveDom.__previewPanel.clipImage?.parentElement).inert = false;
           }
         });
       });
@@ -196,28 +227,60 @@ export const clipboard: {
       li.appendChild( viewText );
       operation.appendChild( copyButton );
       li.appendChild( operation );
-      this.liveDom.__contentPanel.__history.recordList?.insertAdjacentElement('afterbegin', li);
+
+      switch ( tab ) {
+        case 'history':
+          this.liveDom.__contentPanel.__history.recordList?.insertAdjacentElement('afterbegin', li);
+          break;
+        case 'search':
+          this.liveDom.__contentPanel.__search.recordList?.insertAdjacentElement('afterbegin', li);
+          break;
+        case 'tmp':
+          this.liveDom.__contentPanel.__tmp.recordList?.insertAdjacentElement('afterbegin', li);
+      }
     }
 
-    window.electron.ipcRenderer.invoke('get-clipboard-historys', 0 )
-      .then((historys) => {
-        if ( historys.length > 0 ) {
-          historys.forEach((hist) => {
-            const clipboard: [ string, string ][] = []
-            for ( let [ type, data ] of Object.entries(hist) ) {
-              if ( type === 'text' && typeof data === 'string' ) {
-                clipboard.push([ 'text/plain', data ]);
-              } else if ( type === 'html' && typeof data === 'string' ) {
-                clipboard.push([ 'text/html', data ]);
-              } else if ( type === 'rtf' && typeof data === 'string' ) {
-                clipboard.push([ 'text/rtf', data ]);
-              } else if ( type === 'image' && typeof data === 'string' ) {
-                clipboard.push([ 'image/png', data ]);
-              }
-            }
+    const clipboardVariableBuilder = ( records: {
+      id: number, text: string, html: string, rtf: string,
+      image: string, register_time: string
+    }[], tab: 'history' | 'search' | 'tmp' ) => {
 
-            viewHistoryRecord( clipboard );
-          });
+      records.forEach((hist) => {
+        const clipboard: [ string, string ][] = []
+        for ( let [ type, data ] of Object.entries(hist) ) {
+          if ( type === 'text' && typeof data === 'string' ) {
+            clipboard.push([ 'text/plain', data ]);
+          } else if ( type === 'html' && typeof data === 'string' ) {
+            clipboard.push([ 'text/html', data ]);
+          } else if ( type === 'rtf' && typeof data === 'string' ) {
+            clipboard.push([ 'text/rtf', data ]);
+          } else if ( type === 'image' && typeof data === 'string' ) {
+            clipboard.push([ 'image/png', data ]);
+          }
+        }
+
+        viewHistoryRecord( clipboard, tab );
+      });
+    }
+
+    window.electron.ipcRenderer.invoke('get-clipboard', { type: 'history', offset: 0 } )
+      .then((historys) => {
+        console.log( this.liveDom.__contentPanel.__history.recordList?.childElementCount )
+        if ( this.liveDom.__contentPanel.__history.recordList?.childElementCount === 1 ) {
+          noDataRecordHistory.classList.add('hide');
+        }
+        if ( historys.length > 0 ) {
+          clipboardVariableBuilder( historys, 'history' );
+        }
+      });
+
+    window.electron.ipcRenderer.invoke('get-clipboard', { type: 'tmp', offset: 0 })
+      .then((tmp) => {
+        if ( this.liveDom.__contentPanel.__tmp.recordList?.childElementCount === 1 ) {
+          noDataRecordTmp.classList.add('hide');
+        }
+        if ( tmp.length > 0 ) {
+          clipboardVariableBuilder( tmp, 'tmp' );
         }
       });
 
@@ -225,42 +288,56 @@ export const clipboard: {
 
       new Promise<void>( async (resolve) => {
 
-        if ( oneStopEntryFlag ) {
-          oneStopEntryFlag = false; return;
-        }
-
         const clipboard = await window.electron.ipcRenderer.invoke('clipboard-read');
 
         if ( clipboard.length === 0 ) { resolve(); return; }
-        if ( cliptmp === clipboard[0][1] ) { resolve(); return; }
-        if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { resolve(); return; }
+        else if ( cliptmp === clipboard[0][1] ) { resolve(); return; }
+        else if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { resolve(); return; }
         else cliptmp = clipboard[0][1];
         //console.log(clipboard);
 
         window.electron.ipcRenderer.send('clipboard-insert-db', clipboard);
 
-        viewHistoryRecord( clipboard );
+        viewHistoryRecord( clipboard, 'history' );
 
         resolve();
       })
     }
 
     window.electron.ipcRenderer.on('clipboard-change', () => {
+      if ( this.liveDom.__contentPanel.__history.recordList?.childElementCount === 1 ) {
+        noDataRecordHistory.classList.add('hide');
+      }
       clipboardLisner();
     });
 
-    this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-text-copy')!
+    window.electron.ipcRenderer.on('update-clipboard-saved', (_, savedRecord) => {
+      if ( this.liveDom.__contentPanel.__tmp.recordList?.childElementCount === 1 ) {
+        noDataRecordTmp.classList.add('hide');
+      }
+      viewHistoryRecord( savedRecord.clips, 'tmp' );
+    });
+
+    this.liveDom.contentPanel.querySelector<HTMLButtonElement>('#clip-saved-all-del-btn')!
       .addEventListener('click', () => {
+        window.electron.ipcRenderer.invoke('clipboard-saved-all-delete');
+      });
+
+    this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-text-copy')!
+      .addEventListener('click', async () => {
+        await window.electron.ipcRenderer.invoke('update-clipboard-write-time');
         window.electron.ipcRenderer.send('clipboard-write', [ 'text/plain', this.liveDom.__previewPanel.clipText?.value!, false ]);
       });
 
     this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-html-copy')!
-      .addEventListener('click', () => {
+      .addEventListener('click', async () => {
+        await window.electron.ipcRenderer.invoke('update-clipboard-write-time');
         window.electron.ipcRenderer.send('clipboard-write', [ 'text/html', this.liveDom.__previewPanel.clipHtml?.innerHTML! ]);
       });
 
     this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-image-copy')!
-      .addEventListener('click', () => {
+      .addEventListener('click', async () => {
+        await window.electron.ipcRenderer.invoke('update-clipboard-write-time');
         const dataURI = (<HTMLImageElement>this.liveDom.__previewPanel.clipImage!.childNodes[0]).src;
         window.electron.ipcRenderer.send('clipboard-write', [ 'image/png', dataURI ]);
       });

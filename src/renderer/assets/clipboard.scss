@@ -139,10 +139,15 @@ div.content-panel {
       > div.content.show {
         opacity: 1;
       }
-      > div.content.history {
+      > div.content.history,
+      > div.content.search,
+      > div.content.tmp {
+        display: flex;
+        align-items: stretch;
+        flex-flow: column;
+        height: 100%;
         > ul.record-list {
-          display: block;
-          width: 100%;
+          flex-basis: 100%;
           overflow-y: auto;
           overflow-x: hidden;
           padding-right: 10px;
@@ -193,7 +198,30 @@ div.content-panel {
           li.record.click {
             outline: 2px solid;
           }
+          li.no-data-record {
+            margin: 7px 0;
+            margin-left: 2px;
+            background-color: transparent;
+            color: $text-color;
+            user-select: none;
+            text-align: center;
+          }
+          li.no-data-record.hide {
+            display: none;
+          }
         }
+        > div.controller-bottom {
+          width: 100%;
+          height: 30px;
+          > button.all-delete {
+            display: inline-block;
+            width: 100%;
+            height: 100%;
+            font-size: 12pt;
+            background-color: rgb(86, 0, 0);
+            color: orangered;
+          }
+        } 
       }
     }
     > div.content-wrap.resize {
@@ -224,6 +252,11 @@ div.content-panel {
           width: 100%;
           height: auto;
           margin: 5px auto;
+          opacity: 1;
+          overflow: hidden;
+          transform-origin: top;
+          transform: scaleY(1);
+          transition: all .3s ease-in-out;
           > textarea {
             width: 100%;
             font-size: 14pt;
@@ -239,7 +272,7 @@ div.content-panel {
             width: 100%;
             margin: 7px auto;
             position: relative;
-            background-color: midnightblue;
+            background-color: #877000;
             > span.clip-type {
               display: inline-block;
               padding: 5px;;
@@ -266,7 +299,9 @@ div.content-panel {
           }
         }
         > .view.hide {
-          display: none;
+          opacity: 0;
+          height: 0;
+          transform: scaleY(0);
         }
       }
     }

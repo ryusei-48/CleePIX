@@ -422,10 +422,23 @@ export const clipboard: {
       <div class="tab-content">
         <div class="content-wrap">
           <div class="content history show">
-            <ul class="record-list"></ul>
+            <ul class="record-list">
+              <li class="no-data-record">まだデータがありません。</li>
+            </ul>
           </div>
-          <div class="content search" inert>いいいいいいいいいいいいい</div>
-          <div class="content tmp" inert>うううううううううううううう</div>
+          <div class="content search" inert>
+            <ul class="record-list">
+              <li class="no-data-record">まだデータがありません。</li>
+            </ul>
+          </div>
+          <div class="content tmp" inert>
+            <ul class="record-list">
+              <li class="no-data-record">まだデータがありません。</li>
+            </ul>
+            <div class="controller-bottom">
+              <button id="clip-saved-all-del-btn" class="all-delete"><i class="fa-regular fa-trash-can"></i> 全て削除</button>
+            </div>
+          </div>
         </div>
         <span draggable="true" class="resize-bar"></span>
         <div class="preview-panel">

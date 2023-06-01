@@ -1,6 +1,6 @@
 import {
   app, shell, BrowserWindow, ipcMain, nativeTheme, Menu, Tray, nativeImage,
-  clipboard, globalShortcut, IpcMainEvent
+  clipboard, globalShortcut, dialog
 } from 'electron';
 import Store from 'electron-store';
 import { join } from 'path'
@@ -31,7 +31,7 @@ const CleePIX: {
   },
   extraStorage: { db?: Database.Database, stmt: {
     insertHistory?: Database.Statement, selectHistoryFirst?: Database.Statement
-    insertHistorySaved?: Database.Statement
+    insertHistorySaved?: Database.Statement, selectHistorySaved?: Database.Statement
   } },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Statement }}},
   config: Store<storeConfig>, configTemp?: storeConfig,
@@ -394,6 +394,7 @@ const CleePIX: {
     // ##############################################
     // クリップボードウィンドウ
     // ##############################################
+    let clipboardPasteTime: number = 0;
     const insertClipFunc = ( clip: [ string, string ][], mode: number = 0 ) => {
 
       const insertClips: {
@@ -408,13 +409,15 @@ const CleePIX: {
 
       switch ( mode ) {
         case 0:
-          this.extraStorage.stmt.insertHistory?.run(
+          return this.extraStorage.stmt.insertHistory?.run(
             insertClips.text, insertClips.html, insertClips.rtf, insertClips.image
-          ); break;
+          );
         case 1:
-          this.extraStorage.stmt.insertHistorySaved?.run(
+          return this.extraStorage.stmt.insertHistorySaved?.run(
             insertClips.text, insertClips.html, insertClips.rtf, insertClips.image
-          ); break;
+          );
+        default:
+          return undefined;
       }
     }
 
@@ -471,6 +474,11 @@ const CleePIX: {
       }
     });
 
+    ipcMain.handle('update-clipboard-write-time', () => {
+      clipboardPasteTime = Date.now();
+      return clipboardPasteTime;
+    });
+
     ipcMain.on('clip-hist-copy', (_, hist) => {
       const contextMenu = Menu.buildFromTemplate(
         [...hist.clips.map((clip) => {
@@ -486,7 +494,14 @@ const CleePIX: {
               clipboard.writeImage( nativeImage.createFromDataURL( clip[1] ) );
             }
           }}
-        }), ...[ { label: '一時保存', click: () => insertClipFunc( hist.clips, 1 ) } ]]
+        }), ...( hist.type === 'history' ? [ { label: '一時保存', click: () => {
+          const insertResult = insertClipFunc( hist.clips, 1 );
+          if ( insertResult && insertResult.changes === 1 ) {
+            this.Windows.clipboard?.webContents.send('update-clipboard-saved', {
+              insertId: insertResult.lastInsertRowid, clips: hist.clips
+            });
+          }
+        }}] : [])]
       );
 
       contextMenu.popup({ window: this.Windows!.clipboard!, x: hist.pos.x, y: hist.pos.y });
@@ -504,8 +519,31 @@ const CleePIX: {
 
     ipcMain.on('clipboard-insert-db', (_, hist) => insertClipFunc( hist ));
 
-    ipcMain.handle('get-clipboard-historys', (_, offset) => {
-      return this.extraStorage.stmt.selectHistoryFirst?.all( offset, 60 );
+    ipcMain.handle('get-clipboard', (_, arg) => {
+      if ( arg.type === 'history' ) {
+        return this.extraStorage.stmt.selectHistoryFirst?.all( arg.offset, 60 );
+      } else if ( arg.type === 'tmp' ) {
+        return this.extraStorage.stmt.selectHistorySaved?.all ( arg.offset, 60 );
+      } else return [];
+    });
+
+    ipcMain.handle('clipboard-saved-all-delete', async () => {
+      const result = await dialog.showMessageBox( this.Windows.clipboard!, {
+        type: 'question',
+        buttons: ['はい', 'いいえ'],
+        defaultId: 0,
+        title: '一時保存されたデータの削除',
+        message: '一時保存されたクリップボードデータを全て削除してもよろしいですか？',
+        detail: 'This action cannot be undone.',
+      });
+
+      if ( result.response === 0 ) {
+        console.log('削除しました。');
+      } else {
+        console.log('キャンセルしました。');
+      }
+
+      return
     });
 
     // ##############################################
@@ -577,7 +615,9 @@ const CleePIX: {
 
         clipboardLisner.startListening();
         clipboardLisner.on('change', () => {
-          this.Windows!.clipboard!.webContents.send('clipboard-change');
+          if ( Date.now() - clipboardPasteTime > 600 ) {
+            this.Windows!.clipboard!.webContents.send('clipboard-change');
+          }
         });
       });
 
@@ -862,6 +902,10 @@ const CleePIX: {
 
     this.extraStorage.stmt.selectHistoryFirst = this.extraStorage.db.prepare(
       `SELECT * FROM clipboard_history ORDER BY register_time ASC LIMIT ?, ?`
+    );
+
+    this.extraStorage.stmt.selectHistorySaved = this.extraStorage.db.prepare(
+      `SELECT * FROM clipboard_saved ORDER BY register_time ASC LIMIT ?, ?`
     );
   },
 
