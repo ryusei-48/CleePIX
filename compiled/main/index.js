@@ -515,6 +515,16 @@ const CleePIX = {
               clips: hist.clips
             });
           }
+        } }, { label: "削除", click: () => {
+          const deleteResult = this.extraStorage.stmt.deleteHistoryRecord?.run(hist.rowId);
+          if (deleteResult && deleteResult.changes === 1) {
+            this.Windows.clipboard?.webContents.send("deleted-record", { type: "history", rowId: hist.rowId });
+          }
+        } }] : hist.type === "tmp" ? [{ label: "削除", click: () => {
+          const deleteResult = this.extraStorage.stmt.deleteSavedRecord?.run(hist.rowId);
+          if (deleteResult && deleteResult.changes === 1) {
+            this.Windows.clipboard?.webContents.send("deleted-record", { type: "tmp", rowId: hist.rowId });
+          }
         } }] : []]
       );
       contextMenu.popup({ window: this.Windows.clipboard, x: hist.pos.x, y: hist.pos.y });
@@ -528,7 +538,13 @@ const CleePIX = {
         this.Windows.clipboard?.setBounds({ width }, true);
       }
     });
-    electron.ipcMain.on("clipboard-insert-db", (_, hist) => insertClipFunc(hist));
+    electron.ipcMain.handle("clipboard-insert-db", (_, hist) => {
+      const result = insertClipFunc(hist);
+      if (result && result.changes === 1) {
+        return result.lastInsertRowid;
+      } else
+        return null;
+    });
     electron.ipcMain.handle("get-clipboard", (_, arg) => {
       if (arg.type === "history") {
         return this.extraStorage.stmt.selectHistoryFirst?.all(arg.offset, 60);
@@ -543,15 +559,31 @@ const CleePIX = {
         buttons: ["はい", "いいえ"],
         defaultId: 0,
         title: "一時保存されたデータの削除",
-        message: "一時保存されたクリップボードデータを全て削除してもよろしいですか？",
-        detail: "This action cannot be undone."
+        message: "一時保存済みクリップボードデータを全て削除",
+        detail: "一時保存済みクリップボードデータを全て削除してもよろしいですか？"
       });
       if (result.response === 0) {
-        console.log("削除しました。");
-      } else {
-        console.log("キャンセルしました。");
+        const result2 = this.extraStorage.db?.prepare(`DELETE FROM clipboard_saved`).run();
+        if (result2 && result2.changes > 0)
+          return true;
       }
-      return;
+      return false;
+    });
+    electron.ipcMain.handle("clipboard-history-all-delete", async () => {
+      const result = await electron.dialog.showMessageBox(this.Windows.clipboard, {
+        type: "question",
+        buttons: ["はい", "いいえ"],
+        defaultId: 0,
+        title: "履歴の削除",
+        message: "保存された全ての履歴を削除",
+        detail: "保存された全ての履歴を削除してもよろしいですか？"
+      });
+      if (result.response === 0) {
+        const result2 = this.extraStorage.db?.prepare(`DELETE FROM clipboard_history`).run();
+        if (result2 && result2.changes > 0)
+          return true;
+      }
+      return false;
     });
     electron.ipcMain.on("feedreader-win-open", () => {
       if (!this.Windows.feedreader?.isVisible()) {
@@ -851,6 +883,32 @@ const CleePIX = {
           PRIMARY KEY("id" AUTOINCREMENT)
         )`
       ).run();
+      this.extraStorage.db.prepare(
+        `CREATE INDEX clipboard_history_update_time_index ON clipboard_history( register_time )`
+      ).run();
+      this.extraStorage.db.prepare(
+        `CREATE VIRTUAL TABLE clipboard_history_index USING FTS5( clip )`
+      ).run();
+      this.extraStorage.db.prepare(
+        `CREATE TRIGGER update_clipboard_history_index AFTER INSERT ON clipboard_history
+          BEGIN
+            DELETE FROM clipboard_history_index WHERE rowid = new.id;
+            INSERT INTO clipboard_history_index(rowid, clip) VALUES (new.id, new.text);
+          END`
+      ).run();
+      this.extraStorage.db.prepare(
+        `CREATE TRIGGER update_clipboard_history_index_after_update AFTER UPDATE ON clipboard_history
+          BEGIN
+            DELETE FROM clipboard_history_index WHERE rowid = old.id;
+            INSERT INTO clipboard_history_index(rowid, clip) VALUES (new.id, new.text);
+          END`
+      ).run();
+      this.extraStorage.db.prepare(
+        `CREATE TRIGGER update_clipboard_history_index_after_delete AFTER DELETE ON clipboard_history
+          BEGIN
+            DELETE FROM clipboard_history_index WHERE rowid = old.id;
+          END`
+      ).run();
     }
     this.extraStorage.stmt.insertHistory = this.extraStorage.db.prepare(
       `INSERT INTO clipboard_history ( text, html, rtf, image ) VALUES ( ?, ?, ?, ? )`
@@ -863,6 +921,12 @@ const CleePIX = {
     );
     this.extraStorage.stmt.selectHistorySaved = this.extraStorage.db.prepare(
       `SELECT * FROM clipboard_saved ORDER BY register_time ASC LIMIT ?, ?`
+    );
+    this.extraStorage.stmt.deleteHistoryRecord = this.extraStorage.db.prepare(
+      `DELETE FROM clipboard_history WHERE id = ?`
+    );
+    this.extraStorage.stmt.deleteSavedRecord = this.extraStorage.db.prepare(
+      `DELETE FROM clipboard_saved WHERE id = ?`
     );
   },
   createWindowInstance: function(mode) {

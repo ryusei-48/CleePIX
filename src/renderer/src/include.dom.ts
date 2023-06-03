@@ -425,10 +425,22 @@ export const clipboard: {
             <ul class="record-list">
               <li class="no-data-record">まだデータがありません。</li>
             </ul>
+            <div class="controller-bottom">
+              <button id="clip-history-all-del-btn" class="all-delete"><i class="fa-regular fa-trash-can"></i> 全て削除</button>
+            </div>
           </div>
           <div class="content search" inert>
+            <fieldset class="search-controller">
+              <legend>履歴の検索フィールド</legend>
+              <input type="search" id="history-search-text" placeholder="検索フィールド" />
+              <label for="history-search-sort">並び替え</label>
+              <select id="history-search-sort">
+                <option value="ask">日付の遅い順</option>
+                <option value="desc">日付の早い順</option>
+              </select>
+            </fieldset> 
             <ul class="record-list">
-              <li class="no-data-record">まだデータがありません。</li>
+              <li class="no-data-record">結果はありません。</li>
             </ul>
           </div>
           <div class="content tmp" inert>

@@ -128,7 +128,7 @@ export const clipboard: {
 
     let cliptmp: string = '';
 
-    const viewHistoryRecord = ( clipboard: [ string, string ][], tab: 'history' | 'search' | 'tmp' ) => {
+    const viewHistoryRecord = ( rowId: number, clipboard: [ string, string ][], tab: 'history' | 'search' | 'tmp' ) => {
 
       const li = document.createElement('li');
       const viewText = document.createElement('span');
@@ -136,6 +136,7 @@ export const clipboard: {
       const copyButton = document.createElement('button');
       li.tabIndex = 0;
       li.classList.add('record', 'animate__animated', 'animate__fadeInLeft');
+      li.dataset.rowId = `${ rowId }`;
       operation.classList.add('operation');
       copyButton.classList.add('copy');
       copyButton.title = 'クリップボードに送る';
@@ -149,7 +150,10 @@ export const clipboard: {
       });
 
       li.addEventListener('contextmenu', (e) => {
-        window.electron.ipcRenderer.send('clip-hist-copy', { clips: clipboard, pos: { x: e.x, y: e.y }, type: tab });
+        window.electron.ipcRenderer.send('clip-hist-copy', {
+          rowId: Number( (<HTMLLIElement>e.currentTarget).dataset.rowId ),
+          clips: clipboard, pos: { x: e.x, y: e.y }, type: tab
+        });
       });
 
       li.addEventListener('dblclick', (e) => {
@@ -259,49 +263,41 @@ export const clipboard: {
           }
         }
 
-        viewHistoryRecord( clipboard, tab );
+        viewHistoryRecord( hist.id, clipboard, tab );
       });
     }
 
     window.electron.ipcRenderer.invoke('get-clipboard', { type: 'history', offset: 0 } )
       .then((historys) => {
-        console.log( this.liveDom.__contentPanel.__history.recordList?.childElementCount )
-        if ( this.liveDom.__contentPanel.__history.recordList?.childElementCount === 1 ) {
-          noDataRecordHistory.classList.add('hide');
-        }
         if ( historys.length > 0 ) {
+          noDataRecordHistory.classList.add('hide');
           clipboardVariableBuilder( historys, 'history' );
         }
       });
 
     window.electron.ipcRenderer.invoke('get-clipboard', { type: 'tmp', offset: 0 })
       .then((tmp) => {
-        if ( this.liveDom.__contentPanel.__tmp.recordList?.childElementCount === 1 ) {
-          noDataRecordTmp.classList.add('hide');
-        }
         if ( tmp.length > 0 ) {
+          noDataRecordTmp.classList.add('hide');
           clipboardVariableBuilder( tmp, 'tmp' );
         }
       });
 
     const clipboardLisner = async () => {
 
-      new Promise<void>( async (resolve) => {
+      const clipboard = await window.electron.ipcRenderer.invoke('clipboard-read');
 
-        const clipboard = await window.electron.ipcRenderer.invoke('clipboard-read');
+      if ( clipboard.length === 0 ) { resolve(); return; }
+      else if ( cliptmp === clipboard[0][1] ) { resolve(); return; }
+      else if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { resolve(); return; }
+      else cliptmp = clipboard[0][1];
+      //console.log(clipboard);
 
-        if ( clipboard.length === 0 ) { resolve(); return; }
-        else if ( cliptmp === clipboard[0][1] ) { resolve(); return; }
-        else if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { resolve(); return; }
-        else cliptmp = clipboard[0][1];
-        //console.log(clipboard);
+      const rowId = await window.electron.ipcRenderer.invoke('clipboard-insert-db', clipboard);
 
-        window.electron.ipcRenderer.send('clipboard-insert-db', clipboard);
-
-        viewHistoryRecord( clipboard, 'history' );
-
-        resolve();
-      })
+      if ( rowId ) {
+        viewHistoryRecord( rowId, clipboard, 'history' );
+      }
     }
 
     window.electron.ipcRenderer.on('clipboard-change', () => {
@@ -315,12 +311,37 @@ export const clipboard: {
       if ( this.liveDom.__contentPanel.__tmp.recordList?.childElementCount === 1 ) {
         noDataRecordTmp.classList.add('hide');
       }
-      viewHistoryRecord( savedRecord.clips, 'tmp' );
+      viewHistoryRecord( savedRecord.insertId, savedRecord.clips, 'tmp' );
     });
 
+    this.liveDom.contentPanel.querySelector<HTMLButtonElement>('#clip-history-all-del-btn')!
+      .addEventListener('click', async () => {
+        const isDeleted = await window.electron.ipcRenderer.invoke('clipboard-history-all-delete');
+        if ( isDeleted ) {
+          this.liveDom.__contentPanel.__history.recordList
+            ?.querySelectorAll<HTMLLIElement>('li.record').forEach((li) => {
+              (<HTMLLIElement>li).classList.replace('animate__fadeInLeft', 'animate__fadeOutUp');
+              setTimeout(() => { (<HTMLLIElement>li).remove() }, 500);
+              clickedLi.history = undefined;
+              noDataRecordHistory.classList.remove('hide');
+              viewPartsHide();
+            });
+        }
+      });
+
     this.liveDom.contentPanel.querySelector<HTMLButtonElement>('#clip-saved-all-del-btn')!
-      .addEventListener('click', () => {
-        window.electron.ipcRenderer.invoke('clipboard-saved-all-delete');
+      .addEventListener('click', async () => {
+        const isDeleted = await window.electron.ipcRenderer.invoke('clipboard-saved-all-delete');
+        if ( isDeleted ) {
+          this.liveDom.__contentPanel.__tmp.recordList
+            ?.querySelectorAll<HTMLLIElement>('li.record').forEach((li) => {
+              (<HTMLLIElement>li).classList.replace('animate__fadeInLeft', 'animate__fadeOutUp');
+              setTimeout(() => { (<HTMLLIElement>li).remove() }, 500);
+              clickedLi.tmp = undefined;
+              noDataRecordTmp.classList.remove('hide');
+              viewPartsHide();
+            });
+        }
       });
 
     this.liveDom.previewPanel.querySelector<HTMLButtonElement>('#preview-clip-text-copy')!
@@ -341,6 +362,48 @@ export const clipboard: {
         const dataURI = (<HTMLImageElement>this.liveDom.__previewPanel.clipImage!.childNodes[0]).src;
         window.electron.ipcRenderer.send('clipboard-write', [ 'image/png', dataURI ]);
       });
+
+    window.electron.ipcRenderer.on('deleted-record', (_, deleted) => {
+      if ( deleted.type === 'history' ) {
+        [
+          this.liveDom.__contentPanel.__history.recordList,
+          this.liveDom.__contentPanel.__tmp.recordList
+        ].forEach((ul, index) => {
+          const targetLi = ul!.querySelector<HTMLLIElement>(`li.record[data-row-id='${ deleted.rowId }']`);
+          if ( targetLi ) {
+            targetLi.classList.replace('animate__fadeInLeft', 'animate__fadeOutUp');
+            if ( index === 0 && Number( clickedLi.history?.dataset.rowId ) === deleted.rowId ) {
+              clickedLi.history = undefined; viewPartsHide();
+            } else if ( index === 1 && Number( clickedLi.search?.dataset.rowId ) === deleted.rowId ) {
+              clickedLi.search = undefined; viewPartsHide();
+            }
+
+            setTimeout(() => {
+              targetLi.remove();
+              if ( ul!.childElementCount === 1 && index === 0 ) {
+                noDataRecordHistory.classList.remove('hide');
+              } else if ( ul!.childElementCount === 1 && index === 1 ) {
+                noDataRecordSearch.classList.remove('hide');
+              }
+            }, 500);
+          }
+        });
+      } else if ( deleted.type === 'tmp' ) {
+        const targetLi = this.liveDom.__contentPanel.__tmp.recordList!
+          .querySelector<HTMLLIElement>(`li.record[data-row-id='${ deleted.rowId }']`);
+        targetLi?.classList.replace('animate__fadeInLeft', 'animate__fadeOutUp');
+        if ( clickedLi.tmp?.dataset.rowId === targetLi?.dataset.rowId ) {
+          clickedLi.tmp = undefined; viewPartsHide();
+        }
+
+        setTimeout(() => {
+          targetLi?.remove();
+          if ( this.liveDom.__contentPanel.__tmp.recordList?.childElementCount === 1 ) {
+            noDataRecordTmp.classList.remove('hide');
+          }
+        }, 500);
+      }
+    });
 
     const resizePanelBar = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('span.resize-bar')!;
     const clipContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.content-wrap')!;
