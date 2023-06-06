@@ -10,12 +10,14 @@ import Database from "better-sqlite3-multiple-ciphers";
 import appIcon from './logo.png?asset';
 import importBookmarksWorker from "./thread-scripts/import-bookmarks?nodeWorker";
 import getBookmarksWorker from './thread-scripts/get-bookmarks?nodeWorker';
+import clipHistorySearch from './thread-scripts/clip-history-search?nodeWorker';
 import * as cheerio from "cheerio";
 import axios from "axios";
 import { fromBuffer } from 'file-type-cjs-fix';
 import { parseByString, IBaseMark } from "bookmark-file-parser";
 import RssFeedParser from "rss-parser";
 import clipboardLisner from "clipboard-event";
+import kuromoji from "kuromoji";
 import "./index.d";
 
 const APP_NAME = 'CleePIX';
@@ -36,6 +38,7 @@ const CleePIX: {
   } },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Statement }}},
   config: Store<storeConfig>, configTemp?: storeConfig,
+  textAnalyzer: kuromoji.TokenizerBuilder<kuromoji.IpadicFeatures>,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string }) => void,
   createWindowInstance: ( mode: 'main' | 'feedreader' | 'clipboard' ) => BrowserWindow,
   initializeExtraDB: () => void,
@@ -54,6 +57,7 @@ const CleePIX: {
     forScraping: null, forScreenshot: null, feedreader: null, clipboard: null,
   }, storage: {}, extraStorage: { stmt: {} },
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
+  textAnalyzer: kuromoji.builder({ dicPath: join(require.resolve('kuromoji'), '../../dict') }),
 
   run: function () {
 
@@ -543,6 +547,17 @@ const CleePIX: {
       } else return [];
     });
 
+    ipcMain.handle('clip-history-search', async (_, query) => {
+      return await new Promise((resolve) => {
+        clipHistorySearch({
+          workerData: {
+            dbPath: STORAGE_PATH + '/extra_data.db', query: query.string, startDate: query.startDate,
+            endDate: query.endDate, sort: query.sort, offset: query.offset
+          }
+        }).on('message', (clips) => resolve( clips ));
+      });
+    });
+
     ipcMain.handle('clipboard-saved-all-delete', async () => {
       const result = await dialog.showMessageBox( this.Windows.clipboard!, {
         type: 'question',
@@ -929,7 +944,7 @@ const CleePIX: {
       ).run();
 
       this.extraStorage.db.prepare(
-        `CREATE VIRTUAL TABLE clipboard_history_index USING FTS5( clip )`
+        `CREATE VIRTUAL TABLE clipboard_history_index USING FTS5( clip, tokenize=porter )`
       ).run();
 
       this.extraStorage.db.prepare(
@@ -1116,3 +1131,8 @@ async function sleep( second: number ): Promise<void> {
 */
 // App init
 CleePIX.run();
+
+CleePIX.textAnalyzer.build((_, tokenizer) => {
+  let path = tokenizer.tokenize("【中華の闇】Amazonで800円の世界最安トナーは本当に使えるのか？【レーザープリンタ】");
+  console.log(path.map((word) => word.surface_form).join(' '));
+});

@@ -17,14 +17,13 @@ readInterface.question("入力してください >",
   });
 */
 
-const clipboardListener = require('clipboard-event');
+const kuromoji = require("kuromoji");
+const { join } = require("path");
 
-// To start listening
-clipboardListener.startListening();
+const dictPath = join(require.resolve('kuromoji'), '../../dict');
 
-clipboardListener.on('change', () => {
-    console.log('Clipboard changed');
+kuromoji.builder({ dicPath: dictPath }).build(function (err, tokenizer) {
+  // tokenizer is ready
+  var path = tokenizer.tokenize("【中華の闇】Amazonで800円の世界最安トナーは本当に使えるのか？【レーザープリンタ】");
+  console.log(path.map((word) => word.surface_form).join(' '));
 });
-
-// To stop listening
-//clipboardListener.stopListening();

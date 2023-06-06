@@ -438,7 +438,21 @@ export const clipboard: {
                 <option value="ask">日付の遅い順</option>
                 <option value="desc">日付の早い順</option>
               </select>
-            </fieldset> 
+              <label for="history-search-institution">期間</label>
+              <select id="history-search-institution">
+                <option value="today">本日</option>
+                <option value="yesterday">前日</option>
+                <option value="2-days-ago">一昨日</option>
+                <option value="all-sadness">全悲観</option>
+                <option value="time-limit">期間指定</option>
+              </select>
+              <div class="select-time-limit" inert>
+                <label for="search-start-time-limit">開始</label>
+                <input type="datetime-local" class="datetime" id="search-start-time-limit" />
+                <label for="search-end-time-limit">終了</label>
+                <input type="datetime-local" class="datetime" id="search-end-time-limit" />
+              </div>
+            </fieldset>
             <ul class="record-list">
               <li class="no-data-record">結果はありません。</li>
             </ul>

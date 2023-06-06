@@ -6,14 +6,18 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin(),
-      bytecodePlugin({ protectedStrings: [ "ready-to-show" ], chunkAlias: [ "index", "import_bookmarks", "get_bookmarks" ] })
+      bytecodePlugin({
+        protectedStrings: [ "ready-to-show" ],
+        chunkAlias: [ "index", "import_bookmarks", "get_bookmarks", "clip_history_search" ]
+      })
     ],
     build: {
       rollupOptions: {
         input: {
           index: resolve(__dirname, './src/main/index.ts'),
           import_bookmarks: resolve(__dirname, './src/main/thread-scripts/import-bookmarks.ts'),
-          get_bookmarks: resolve(__dirname, './src/main/thread-scripts/get-bookmarks.ts')
+          get_bookmarks: resolve(__dirname, './src/main/thread-scripts/get-bookmarks.ts'),
+          clip_history_search: resolve(__dirname, './src/main/thread-scripts/clip-history-search.ts')
         }
       },
       minify: true,

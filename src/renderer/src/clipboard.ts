@@ -287,9 +287,9 @@ export const clipboard: {
 
       const clipboard = await window.electron.ipcRenderer.invoke('clipboard-read');
 
-      if ( clipboard.length === 0 ) { resolve(); return; }
-      else if ( cliptmp === clipboard[0][1] ) { resolve(); return; }
-      else if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { resolve(); return; }
+      if ( clipboard.length === 0 ) { return; }
+      else if ( cliptmp === clipboard[0][1] ) { return; }
+      else if ( clipboard.length === 1 && clipboard[0][0] === 'text/rtf' ) { return; }
       else cliptmp = clipboard[0][1];
       //console.log(clipboard);
 
@@ -402,6 +402,32 @@ export const clipboard: {
             noDataRecordTmp.classList.remove('hide');
           }
         }, 500);
+      }
+    });
+
+    const searchStringInput = this.liveDom.__contentPanel.search.querySelector<HTMLInputElement>('#history-search-text')!;
+    const selectTimeLimit = this.liveDom.__contentPanel.search.querySelector<HTMLDivElement>('div.select-time-limit')!;
+
+    this.liveDom.__contentPanel.search.querySelector<HTMLSelectElement>('#history-search-institution')!
+      .addEventListener('change', (e) => {
+        if ( (<HTMLSelectElement>e.currentTarget).value === 'time-limit' ) {
+          selectTimeLimit.classList.add('show');
+          selectTimeLimit.inert = false;
+        } else if ( selectTimeLimit.classList.contains('show') ) {
+          selectTimeLimit.classList.remove('show');
+          selectTimeLimit.inert = true;
+        }
+      });
+
+    searchStringInput.addEventListener('keyup', (e) => {
+      if ( !e.isComposing && (<HTMLInputElement>e.currentTarget).value !== '' ) {
+        window.electron.ipcRenderer.invoke('clip-history-search', {
+          string: (<HTMLInputElement>e.currentTarget).value,
+          startDate: '2023-06-05 00:00', endDate: '2023-06-05 23:59',
+          sort: 'ASC', offset: 0
+        }).then((clips) => {
+          console.log(clips);
+        })
       }
     });
 

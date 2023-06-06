@@ -140,6 +140,92 @@ div.content-panel {
         opacity: 0;
         transition: opacity .3s ease-in-out;
         overflow-y: auto;
+        fieldset.search-controller {
+          display: block;
+          width: 100%;
+          input#history-search-text {
+            width: 100%;
+            padding: 5px;
+            font-size: 12pt;
+            &::placeholder {
+              padding: 5px;
+              font-size: 12pt;
+            }
+          }
+          label {
+            display: inline-block;
+            width: 24%;
+            text-align: center;
+            font-size: 11pt;
+            padding: 3px;
+          }
+          select {
+            display: inline-block;
+            width: 23.5%;
+            background-color: transparent;
+            color: white;
+            text-align: center;
+            border: none;
+            border-bottom: 1px solid #D3B283;
+            padding: 3px;
+            &:focus {
+              outline: none;
+            }
+            > option {
+              background-color: black;
+              color: white;
+              text-align: center;
+              border: none;
+              border-bottom: 1px solid #D3B283;
+              padding: 3px;
+            }
+          }
+          div.select-time-limit {
+            display: block;
+            width: 100%;
+            height: 0;
+            opacity: 0;
+            transform-origin: top;
+            transform: translateY( -50% ) scaleY(0);
+            transition: all .3s ease-in-out;
+            > label {
+              display: inline-block;
+              text-align: center;
+              width: 25%;
+              padding: 3px;
+            }
+            > input.datetime {
+              display: inline-block;
+              text-align: center;
+              width: 60%;
+              background-color: transparent;
+              border: none;
+              color: white;
+              border-bottom: 1px solid #D3B283;
+              padding: 3px;
+              &:focus {
+                outline: none;
+              }
+              &::-webkit-inner-spin-button,
+              &::-webkit-clear-button {
+                //-webkit-appearance: none;
+                color: black;
+              }
+              &::-webkit-calendar-picker-indicator {
+                margin: auto;
+                padding: 0;
+                background: rgb(96, 96, 96);
+                color: black;
+                cursor: pointer;
+              }
+            }
+          }
+          div.select-time-limit.show {
+            opacity: 1;
+            height: auto;
+            transform: translateY( 0% ) scaleY(1);
+          }
+        }
       }
       > div.content.show {
         opacity: 1;
