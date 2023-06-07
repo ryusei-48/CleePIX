@@ -423,7 +423,7 @@ export const clipboard: {
       if ( !e.isComposing && (<HTMLInputElement>e.currentTarget).value !== '' ) {
         window.electron.ipcRenderer.invoke('clip-history-search', {
           string: (<HTMLInputElement>e.currentTarget).value,
-          startDate: '2023-06-05 00:00', endDate: '2023-06-05 23:59',
+          startDate: '2023-06-04 00:00', endDate: '2023-06-07 23:59',
           sort: 'ASC', offset: 0
         }).then((clips) => {
           console.log(clips);

@@ -34,11 +34,12 @@ const CleePIX: {
   extraStorage: { db?: Database.Database, stmt: {
     insertHistory?: Database.Statement, selectHistoryFirst?: Database.Statement
     insertHistorySaved?: Database.Statement, selectHistorySaved?: Database.Statement,
-    deleteHistoryRecord?: Database.Statement, deleteSavedRecord?: Database.Statement
+    deleteHistoryRecord?: Database.Statement, deleteSavedRecord?: Database.Statement,
+    insertHistoryIndex?: Database.Statement
   } },
   storage: {[key: number]: {db?: Database.Database, stmt?: {[key: string]: Database.Statement }}},
   config: Store<storeConfig>, configTemp?: storeConfig,
-  textAnalyzer: kuromoji.TokenizerBuilder<kuromoji.IpadicFeatures>,
+  textAnalyzer?: kuromoji.Tokenizer<kuromoji.IpadicFeatures>,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string }) => void,
   createWindowInstance: ( mode: 'main' | 'feedreader' | 'clipboard' ) => BrowserWindow,
   initializeExtraDB: () => void,
@@ -48,7 +49,8 @@ const CleePIX: {
       title: string, description: string, image: string | null
     } | null>,
     getDomScreenshot: ( url: string ) => Promise<Electron.NativeImage | undefined>,
-    setMetadataAllBookmarks: ( instanceId: number ) => void
+    setMetadataAllBookmarks: ( instanceId: number ) => void,
+    separateTextGenerator: <T extends boolean>( text: string, isQuery: T ) => T extends true ? string[] | undefined : string | undefined
   }
 
 } = {
@@ -57,7 +59,6 @@ const CleePIX: {
     forScraping: null, forScreenshot: null, feedreader: null, clipboard: null,
   }, storage: {}, extraStorage: { stmt: {} },
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
-  textAnalyzer: kuromoji.builder({ dicPath: join(require.resolve('kuromoji'), '../../dict') }),
 
   run: function () {
 
@@ -100,6 +101,12 @@ const CleePIX: {
     ipcMain.handle('get-config', () => {
       return this.config.store;
     });
+
+    kuromoji.builder({ dicPath: join(require.resolve('kuromoji'), '../../dict') })
+      .build((err, tokenizer) => {
+        if ( err ) return;
+        this.textAnalyzer = tokenizer;
+      });
 
     ipcMain.handle('import-bookmark-file', async (_, dataString) => {
       const bookmarks = parseByString(dataString.html);
@@ -414,9 +421,15 @@ const CleePIX: {
 
       switch ( mode ) {
         case 0:
-          return this.extraStorage.stmt.insertHistory?.run(
+          const result = this.extraStorage.stmt.insertHistory?.run(
             insertClips.text, insertClips.html, insertClips.rtf, insertClips.image
           );
+
+          if ( result && result?.changes > 0 ) {
+            return this.extraStorage.stmt.insertHistoryIndex?.run(
+              result.lastInsertRowid, insertClips.text ? this.shareParts.separateTextGenerator( insertClips.text, false ) : null
+            )
+          }
         case 1:
           return this.extraStorage.stmt.insertHistorySaved?.run(
             insertClips.text, insertClips.html, insertClips.rtf, insertClips.image
@@ -551,7 +564,9 @@ const CleePIX: {
       return await new Promise((resolve) => {
         clipHistorySearch({
           workerData: {
-            dbPath: STORAGE_PATH + '/extra_data.db', query: query.string, startDate: query.startDate,
+            dbPath: STORAGE_PATH + '/extra_data.db',
+            query: this.shareParts.separateTextGenerator( query.string, true ) || '',
+            startDate: query.startDate,
             endDate: query.endDate, sort: query.sort, offset: query.offset
           }
         }).on('message', (clips) => resolve( clips ));
@@ -818,6 +833,15 @@ const CleePIX: {
           );
         }
       }catch (e) { console.log(e) }
+    },
+
+    separateTextGenerator: function ( text, isQuery ) {
+
+      const textResult = CleePIX.textAnalyzer?.tokenize( text )
+        .map<string>((word) => word.surface_form + (isQuery ? '*' : ''));
+      if ( isQuery ) {
+        return <any>textResult?.filter(word => word.match(/^\s\*$/) === null);
+      } else return <any>textResult?.join(' ');
     }
   },
 
@@ -948,22 +972,6 @@ const CleePIX: {
       ).run();
 
       this.extraStorage.db.prepare(
-        `CREATE TRIGGER update_clipboard_history_index AFTER INSERT ON clipboard_history
-          BEGIN
-            DELETE FROM clipboard_history_index WHERE rowid = new.id;
-            INSERT INTO clipboard_history_index(rowid, clip) VALUES (new.id, new.text);
-          END`
-      ).run();
-
-      this.extraStorage.db.prepare(
-        `CREATE TRIGGER update_clipboard_history_index_after_update AFTER UPDATE ON clipboard_history
-          BEGIN
-            DELETE FROM clipboard_history_index WHERE rowid = old.id;
-            INSERT INTO clipboard_history_index(rowid, clip) VALUES (new.id, new.text);
-          END`
-      ).run();
-
-      this.extraStorage.db.prepare(
         `CREATE TRIGGER update_clipboard_history_index_after_delete AFTER DELETE ON clipboard_history
           BEGIN
             DELETE FROM clipboard_history_index WHERE rowid = old.id;
@@ -993,6 +1001,10 @@ const CleePIX: {
 
     this.extraStorage.stmt.deleteSavedRecord = this.extraStorage.db.prepare(
       `DELETE FROM clipboard_saved WHERE id = ?`
+    );
+
+    this.extraStorage.stmt.insertHistoryIndex = this.extraStorage.db.prepare(
+      `INSERT INTO clipboard_history_index( rowid, clip ) VALUES( ?, ? )`
     );
   },
 
@@ -1131,8 +1143,3 @@ async function sleep( second: number ): Promise<void> {
 */
 // App init
 CleePIX.run();
-
-CleePIX.textAnalyzer.build((_, tokenizer) => {
-  let path = tokenizer.tokenize("【中華の闇】Amazonで800円の世界最安トナーは本当に使えるのか？【レーザープリンタ】");
-  console.log(path.map((word) => word.surface_form).join(' '));
-});
