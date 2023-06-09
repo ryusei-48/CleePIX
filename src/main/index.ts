@@ -564,10 +564,9 @@ const CleePIX: {
       return await new Promise((resolve) => {
         clipHistorySearch({
           workerData: {
-            dbPath: STORAGE_PATH + '/extra_data.db',
+            dbPath: STORAGE_PATH + '/extra_data.db', image: query.image,
             query: this.shareParts.separateTextGenerator( query.string, true ) || '',
-            startDate: query.startDate,
-            endDate: query.endDate, sort: query.sort, offset: query.offset
+            startDate: query.startDate, endDate: query.endDate, offset: query.offset
           }
         }).on('message', (clips) => resolve( clips ));
       });

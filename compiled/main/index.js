@@ -573,10 +573,10 @@ const CleePIX = {
         clipHistorySearch({
           workerData: {
             dbPath: STORAGE_PATH + "/extra_data.db",
+            image: query.image,
             query: this.shareParts.separateTextGenerator(query.string, true) || "",
             startDate: query.startDate,
             endDate: query.endDate,
-            sort: query.sort,
             offset: query.offset
           }
         }).on("message", (clips) => resolve(clips));

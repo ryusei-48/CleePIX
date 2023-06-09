@@ -30,7 +30,7 @@ export declare global {
       on( channel: 'resize-aspect16/9-win', listener: ( event: IpcMainEvent, arg: boolean ) => void ): Electron.IpcMain;
 
       handle( channel: string, listener: (event: IpcMainInvokeEvent, ...args: any[]) => any): void;
-      handle( channel: 'get-clipboard', listener: ( event: IpcMainInvokeEvent, arg: { type: 'history' | 'tmp', offset: number } ) => any[] ): void;
+      handle( channel: 'get-clipboard', listener: ( event: IpcMainInvokeEvent, arg: { type: 'history' | 'tmp', offset: number, limit: number } ) => any[] ): void;
       handle( channel: 'clipboard-insert-db', listener: ( event: IpcMainEvent, arg:[ string, string ][] ) => void ): Electron.IpcMain;
     }
   }

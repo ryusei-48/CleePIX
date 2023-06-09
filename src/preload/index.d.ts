@@ -34,7 +34,7 @@ declare global {
     invoke( channel: 'clipboard-win-show-top'): Promise<Boolean>;
     invoke( channel: 'get-config' ): Promise<storeConfig>;
     invoke( channel: 'clipboard-read' ): Promise<[ string, string ][]>;
-    invoke( channel: 'get-clipboard', arg: { type: 'history' | 'tmp', offset: number } ): Promise<{ id: number, text: string, html: string, rtf: string, image: string, register_time: string }[]>;
+    invoke( channel: 'get-clipboard', arg: { type: 'history' | 'tmp', offset: number, limit: number } ): Promise<{ id: number, text: string, html: string, rtf: string, image: string, register_time: string }[]>;
     invoke( channel: 'clipboard-saved-all-delete' ): Promise<boolean>;
     invoke( channel: 'clipboard-history-all-delete' ): Promise<boolean>;
     invoke( channel: 'clipboard-insert-db', clip: [ string, string ][] ): Promise<number | null>;

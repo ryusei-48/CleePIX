@@ -433,17 +433,17 @@ export const clipboard: {
             <fieldset class="search-controller">
               <legend>履歴の検索フィールド</legend>
               <input type="search" id="history-search-text" placeholder="検索フィールド" />
-              <label for="history-search-sort">並び替え</label>
-              <select id="history-search-sort">
-                <option value="ask">日付の遅い順</option>
-                <option value="desc">日付の早い順</option>
-              </select>
+              <input type="checkbox" id="history-search-image" value="image" />
+              <label class="checkbox" for="history-search-image">画像を含む</label>
               <label for="history-search-institution">期間</label>
               <select id="history-search-institution">
                 <option value="today">本日</option>
-                <option value="yesterday">前日</option>
-                <option value="2-days-ago">一昨日</option>
-                <option value="all-sadness">全悲観</option>
+                <option value="yesterday">～前日</option>
+                <option value="2-days-ago">～一昨日</option>
+                <option value="a-week-ago">～１週間</option>
+                <option value="2-week-ago">～２週間</option>
+                <option value="3-week-ago">～３週間</option>
+                <option value="all-sadness" selected>全期間</option>
                 <option value="time-limit">期間指定</option>
               </select>
               <div class="select-time-limit" inert>
