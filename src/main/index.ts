@@ -265,6 +265,10 @@ const CleePIX: {
           this.config.set( 'instance', this.configTemp!.instance );
         }
       });
+
+      delete this.configTemp!.cache!.tagTreeDomStrings![ id ];
+      delete this.configTemp!.cache!.selectedTags![ id ];
+      this.config.set( 'cache', this.configTemp!.cache! );
     });
 
     ipcMain.handle('get-add-tag-list', async (_, query) => {
@@ -554,9 +558,9 @@ const CleePIX: {
 
     ipcMain.handle('get-clipboard', (_, arg) => {
       if ( arg.type === 'history' ) {
-        return this.extraStorage.stmt.selectHistoryFirst?.all( arg.offset, 60 );
+        return this.extraStorage.stmt.selectHistoryFirst?.all( arg.limit, arg.offset );
       } else if ( arg.type === 'tmp' ) {
-        return this.extraStorage.stmt.selectHistorySaved?.all ( arg.offset, 60 );
+        return this.extraStorage.stmt.selectHistorySaved?.all ( arg.limit, arg.offset );
       } else return [];
     });
 
@@ -987,11 +991,11 @@ const CleePIX: {
     );
 
     this.extraStorage.stmt.selectHistoryFirst = this.extraStorage.db.prepare(
-      `SELECT * FROM clipboard_history ORDER BY register_time ASC LIMIT ?, ?`
+      `SELECT * FROM clipboard_history ORDER BY register_time DESC LIMIT ? OFFSET ?`
     );
 
     this.extraStorage.stmt.selectHistorySaved = this.extraStorage.db.prepare(
-      `SELECT * FROM clipboard_saved ORDER BY register_time ASC LIMIT ?, ?`
+      `SELECT * FROM clipboard_saved ORDER BY register_time DESC LIMIT ? OFFSET ?`
     );
 
     this.extraStorage.stmt.deleteHistoryRecord = this.extraStorage.db.prepare(

@@ -95,7 +95,10 @@ export const clipboard: {
     this.liveDom.__previewPanel.clipImage = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('#preview-clip-image')!;
 
     const clickedLi: { history?: HTMLLIElement, search?: HTMLLIElement, tmp?: HTMLLIElement } = {};
-    const pageLimits: { history: number, search: number, tmp: number } = { history: 50, search: 50, tmp: 50 };
+    const DEFAULT_RECORD_LIMIT = 15;
+    const pageLimits: { history: number, search: number, tmp: number }
+      = { history: DEFAULT_RECORD_LIMIT, search: DEFAULT_RECORD_LIMIT, tmp: DEFAULT_RECORD_LIMIT };
+    const isRecordEnd: { history: boolean, search: boolean, tmp: boolean } = { history: false, search: false, tmp: false };
 
     const noDataRecordHistory = this.liveDom.__contentPanel.__history.recordList.querySelector<HTMLLIElement>('li.no-data-record')!;
     const noDataRecordSearch = this.liveDom.__contentPanel.__search.recordList.querySelector<HTMLLIElement>('li.no-data-record')!;
@@ -130,7 +133,10 @@ export const clipboard: {
 
     let cliptmp: string = '';
 
-    const viewHistoryRecord = ( rowId: number, clipboard: [ string, string ][], tab: 'history' | 'search' | 'tmp' ) => {
+    const viewHistoryRecord = (
+      rowId: number, clipboard: [ string, string ][],
+      tab: 'history' | 'search' | 'tmp', reverse: boolean = false
+    ) => {
 
       const li = document.createElement('li');
       const viewText = document.createElement('span');
@@ -234,22 +240,24 @@ export const clipboard: {
       operation.appendChild( copyButton );
       li.appendChild( operation );
 
+      const InsertPosition = reverse ? 'beforeend' : 'afterbegin';
+
       switch ( tab ) {
         case 'history':
-          this.liveDom.__contentPanel.__history.recordList?.insertAdjacentElement('afterbegin', li);
+          this.liveDom.__contentPanel.__history.recordList?.insertAdjacentElement(InsertPosition, li);
           break;
         case 'search':
-          this.liveDom.__contentPanel.__search.recordList?.insertAdjacentElement('beforeend', li);
+          this.liveDom.__contentPanel.__search.recordList?.insertAdjacentElement(InsertPosition, li);
           break;
         case 'tmp':
-          this.liveDom.__contentPanel.__tmp.recordList?.insertAdjacentElement('afterbegin', li);
+          this.liveDom.__contentPanel.__tmp.recordList?.insertAdjacentElement(InsertPosition, li);
       }
     }
 
     const clipboardVariableBuilder = ( records: {
       id: number, text: string, html: string, rtf: string,
       image: string, register_time: string
-    }[], tab: 'history' | 'search' | 'tmp' ) => {
+    }[], tab: 'history' | 'search' | 'tmp', reverse: boolean = false ) => {
 
       records.forEach((hist) => {
         const clipboard: [ string, string ][] = []
@@ -265,7 +273,7 @@ export const clipboard: {
           }
         }
 
-        viewHistoryRecord( hist.id, clipboard, tab );
+        viewHistoryRecord( hist.id, clipboard, tab, reverse );
       });
     }
 
@@ -277,6 +285,10 @@ export const clipboard: {
           noDataRecordHistory.inert = true;
           clipboardVariableBuilder( historys, 'history' );
         }
+
+        if ( historys.length < DEFAULT_RECORD_LIMIT ) {
+          isRecordEnd.history = true;
+        }
       });
 
     window.electron.ipcRenderer
@@ -286,6 +298,10 @@ export const clipboard: {
           noDataRecordTmp.classList.add('hide');
           noDataRecordTmp.inert = true;
           clipboardVariableBuilder( tmp, 'tmp' );
+        }
+
+        if ( tmp.length < DEFAULT_RECORD_LIMIT ) {
+          isRecordEnd.tmp = true;
         }
       });
 
@@ -424,7 +440,7 @@ export const clipboard: {
     const customDateEnd = this.liveDom.__contentPanel.search.querySelector<HTMLInputElement>('#search-end-time-limit')!;
     const includeImage = this.liveDom.__contentPanel.search.querySelector<HTMLInputElement>(`#history-search-image`)!;
 
-    const searchedListBuilder = ( e: Event ) => {
+    const searchedListBuilder = ( e: Event, offset: number = 0 ) => {
 
       this.liveDom.__contentPanel.__search.recordList
         ?.querySelectorAll<HTMLLIElement>('li.record').forEach((li) => {
@@ -464,9 +480,10 @@ export const clipboard: {
           case 'all-sadness':
             startDate = '2000-01-01 00:00'; break;
         }
+
         window.electron.ipcRenderer.invoke('clip-history-search', {
           string: searchStringInput.value, image: includeImage.checked,
-          startDate, endDate, offset: 0
+          startDate, endDate, offset
         }).then((clips) => {
           if ( clips && clips.length > 0 ) {
             noDataRecordSearch.classList.add('hide');
@@ -502,6 +519,104 @@ export const clipboard: {
     endDateInput.addEventListener('change', searchedListBuilder, false);
     includeImage.addEventListener('change', searchedListBuilder, false);
     searchStringInput.addEventListener('keyup', searchedListBuilder, false);
+
+    const isInfiniteScroll: { history: boolean, search: boolean, tmp: boolean } = { history: false, search: false, tmp: false };
+
+    this.liveDom.__contentPanel.__history.recordList
+      .addEventListener('scroll', () => {
+
+        const scrollHeight = this.liveDom.__contentPanel.__history.recordList?.scrollHeight || 0;
+        const scrollTop = this.liveDom.__contentPanel.__history.recordList?.scrollTop || 0;
+        const clientHeight = this.liveDom.__contentPanel.__history.recordList?.clientHeight || 0;
+
+        if ( scrollHeight - scrollTop <= clientHeight + 10 && !isInfiniteScroll.history && !isRecordEnd.history ) {
+
+          isInfiniteScroll.history = true; console.log('scroll');
+
+          window.electron.ipcRenderer
+            .invoke('get-clipboard', {
+              type: 'history', offset: pageLimits.history, limit: DEFAULT_RECORD_LIMIT
+            })
+            .then(( historys ) => {
+              if ( historys.length > 0 ) {
+                noDataRecordHistory.classList.add('hide');
+                noDataRecordHistory.inert = true;
+                clipboardVariableBuilder( historys, 'history', true );
+              }
+
+              if ( historys.length < DEFAULT_RECORD_LIMIT ) {
+                isRecordEnd.history = true;
+              }
+
+              pageLimits.history += DEFAULT_RECORD_LIMIT;
+              isInfiniteScroll.history = false;
+            });
+        }
+      });
+
+    this.liveDom.__contentPanel.__search.recordList
+      .addEventListener('scroll', () => {
+
+        const scrollHeight = this.liveDom.__contentPanel.__search.recordList?.scrollHeight || 0;
+        const scrollTop = this.liveDom.__contentPanel.__search.recordList?.scrollTop || 0;
+        const clientHeight = this.liveDom.__contentPanel.__search.recordList?.clientHeight || 0;
+
+        if ( scrollHeight - scrollTop <= clientHeight && !isInfiniteScroll.search && !isRecordEnd.search ) {
+
+          isInfiniteScroll.search = true;
+
+          /*window.electron.ipcRenderer
+            .invoke('get-clipboard', {
+              type: 'search', offset: pageLimits.search, limit: DEFAULT_RECORD_LIMIT
+            })
+            .then(( historys ) => {
+              if ( historys.length > 0 ) {
+                noDataRecordSearch.classList.add('hide');
+                noDataRecordSearch.inert = true;
+                clipboardVariableBuilder( historys, 'search' );
+              }
+
+              if ( historys.length <= DEFAULT_RECORD_LIMIT ) {
+                isRecordEnd.search = true;
+              }
+
+              pageLimits.search += DEFAULT_RECORD_LIMIT;
+              isInfiniteScroll.search = false;
+            });*/
+        }
+      });
+
+    this.liveDom.__contentPanel.__tmp.recordList
+      .addEventListener('scroll', () => {
+
+        const scrollHeight = this.liveDom.__contentPanel.__tmp.recordList?.scrollHeight || 0;
+        const scrollTop = this.liveDom.__contentPanel.__tmp.recordList?.scrollTop || 0;
+        const clientHeight = this.liveDom.__contentPanel.__tmp.recordList?.clientHeight || 0;
+
+        if ( scrollHeight - scrollTop <= clientHeight && !isInfiniteScroll.tmp && !isRecordEnd.tmp ) {
+
+          isInfiniteScroll.tmp = true;
+
+          window.electron.ipcRenderer
+            .invoke('get-clipboard', {
+              type: 'tmp', offset: pageLimits.tmp, limit: DEFAULT_RECORD_LIMIT
+            })
+            .then(( historys ) => {
+              if ( historys.length > 0 ) {
+                noDataRecordTmp.classList.add('hide');
+                noDataRecordTmp.inert = true;
+                clipboardVariableBuilder( historys, 'tmp', true );
+              }
+
+              if ( historys.length < DEFAULT_RECORD_LIMIT ) {
+                isRecordEnd.tmp = true;
+              }
+
+              pageLimits.tmp += DEFAULT_RECORD_LIMIT;
+              isInfiniteScroll.tmp = false;
+            });
+        }
+      });
 
     const resizePanelBar = this.liveDom.contentPanel.querySelector<HTMLSpanElement>('span.resize-bar')!;
     const clipContent = this.liveDom.contentPanel.querySelector<HTMLDivElement>('div.tab-content > div.content-wrap')!;

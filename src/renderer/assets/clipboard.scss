@@ -1,5 +1,10 @@
 @import './common.scss';
 
+::selection {
+  color: white;
+  background-color: #094a5a;
+}
+
 // #####################
 // ウィンドウタイトルバー
 // #####################

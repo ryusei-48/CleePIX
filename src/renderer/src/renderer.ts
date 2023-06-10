@@ -222,7 +222,9 @@ export const CleePIX: {
             });
 
             const nextTextInput = Object.values(textInputList).shift()!;
-            nextTextInput.click();
+            nextTextInput.dispatchEvent( new Event('click') );
+            CleePIX.liveDom.instancePanel
+              .querySelector<HTMLDivElement>('div.tag-select-panel')!.dispatchEvent( new Event('click') );
             currentTextInput = nextTextInput;
 
             window.electron.ipcRenderer.send('remove-instance', Number(deleteBtn.dataset.id!));
@@ -233,15 +235,16 @@ export const CleePIX: {
         textInput.type = 'text';
         textInput.value = label;
         textInput.dataset.id = id;
-        textInput.readOnly = true;
-        const renameInstance = (): void => {
-          textInput.readOnly = false;
-          textInput.select();
+        /*textInput.readOnly = true;
+        const renameInstance = ( target: HTMLInputElement ): void => {
+          target.readOnly = false;
+          target.select();
+          target.focus();
         };
-        textInput.addEventListener('dblclick', () => {renameInstance();});
+        textInput.addEventListener('dblclick', (e) => { renameInstance( <HTMLInputElement>e.currentTarget )});
         textInput.addEventListener('keydown', e => {
-          if (e.key == 'F2') {renameInstance();}
-        });
+          if (e.key == 'F2') { renameInstance( <HTMLInputElement>e.currentTarget )}
+        });*/
         textInput.addEventListener('change', e => {
           window.electron.ipcRenderer.send('ite-name-update', {
             name: (<HTMLInputElement> e.target).value, id: Number(id)
@@ -261,7 +264,7 @@ export const CleePIX: {
 
           currentTextInput = <HTMLInputElement> e.target;
         });
-        textInput.addEventListener('focusout', () => {textInput.readOnly = true;});
+        //textInput.addEventListener('focusout', () => { textInput.readOnly = true });
 
         if (id === `${CleePIX.currentInstanceId}`) {
           currentTextInput = textInput;
@@ -1148,6 +1151,7 @@ export const CleePIX: {
             selectedTags[ instanceId ] = Number( button.dataset.tagId );
           }
         }
+        console.log('add cache');
         window.electron.ipcRenderer.invoke('set-tag-tree-cache', { tagTreeCache, selectedTags });
       }
 
@@ -1209,6 +1213,9 @@ export const CleePIX: {
               getTagTree(<HTMLLIElement> (button.parentNode?.parentNode), CleePIX.currentInstanceId, Number(button.dataset.tagId));
             });
           });
+
+          CleePIX.liveDom.instancePanel
+            .querySelector<HTMLDivElement>('div.tag-select-panel')!.dispatchEvent( new Event('click') );
         }
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].classList.replace('animate__fadeOutRight', 'animate__fadeInLeft');
         CleePIX.liveDom.tagTreePanel[CleePIX.currentInstanceId].inert = false;
