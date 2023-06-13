@@ -448,7 +448,7 @@ export const CleePIX: {
 
     addText: function () {
 
-      this.commonModalWindow(
+      /*this.commonModalWindow(
         '#show-text-modal-btn', CleePIX.liveDom.addText,
         '.add-text-modal-wrap', '#add-text-title'
       );
@@ -464,7 +464,12 @@ export const CleePIX: {
           ]
         },
         placeholder: 'ここに本文を入力'
-      });
+      });*/
+
+      CleePIX.liveDom.instancePanel.querySelector<HTMLButtonElement>('#show-text-modal-btn')!
+        .addEventListener('click', () => {
+          window.electron.ipcRenderer.send('notepad-open');
+        });
     },
 
     addTagBlock: function () {

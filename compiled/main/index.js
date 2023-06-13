@@ -51,8 +51,8 @@ function _interopNamespaceDefault(e) {
   return Object.freeze(n);
 }
 const cheerio__namespace = /* @__PURE__ */ _interopNamespaceDefault(cheerio);
-const icon = path.join(__dirname, "./chunks/icon-4363016c.png");
-const appIcon = path.join(__dirname, "./chunks/logo-5802e1fb.png");
+const icon = path.join(__dirname, "./chunks/icon-cde652da.png");
+const appIcon = path.join(__dirname, "./chunks/logo-f679ddc0.png");
 function importBookmarksWorker(options) {
   return new node_worker_threads.Worker(require.resolve("./import_bookmarks.js"), options);
 }
@@ -70,7 +70,8 @@ const CleePIX = {
     forScraping: null,
     forScreenshot: null,
     feedreader: null,
-    clipboard: null
+    clipboard: null,
+    notepad: []
   },
   storage: {},
   extraStorage: { stmt: {} },
@@ -83,7 +84,8 @@ const CleePIX = {
         window: {
           main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
           feedreader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          clipboard: { width: 400, minWidth: 400, height: 580, minHeight: 580, x: null, y: null, isMaximize: false, isFixation: false }
+          clipboard: { width: 400, minWidth: 400, height: 580, minHeight: 580, x: null, y: null, isMaximize: false, isFixation: false },
+          notepad: { width: 800, minWidth: 400, height: 450, minHeight: 225, x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: "default",
@@ -622,6 +624,23 @@ const CleePIX = {
         this.Windows.feedreader?.show();
       }
     });
+    electron.ipcMain.on("notepad-open", () => {
+      const newNotepad = this.createWindowInstance("notepad");
+      newNotepad.webContents.on("did-finish-load", () => {
+        newNotepad.webContents.send("window-id", newNotepad.id);
+      });
+      newNotepad.show();
+      this.Windows.notepad[newNotepad.id] = newNotepad;
+    });
+    electron.ipcMain.on("notepad-close", (_, windowId) => {
+      if (windowId) {
+        this.Windows.notepad[windowId].close();
+        this.Windows.notepad[windowId].on("closed", () => {
+          this.Windows.notepad[windowId].destroy();
+          delete this.Windows.notepad[windowId];
+        });
+      }
+    });
     electron.app.whenReady().then(() => {
       this.Windows.main = this.createWindowInstance("main");
       this.Windows.clipboard = this.createWindowInstance("clipboard");
@@ -873,6 +892,23 @@ const CleePIX = {
         )`
       ).run();
       this.storage[storage.id].db.prepare(
+        `CREATE TABLE "documents" (
+          "id"	INTEGER, "data"	TEXT NOT NULL,
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now', 'localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now', 'localtime')),
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
+      ).run();
+      this.storage[storage.id].db.prepare(
+        `CREATE TABLE "docs_tags" (
+          "tag_id"	INTEGER NOT NULL,
+          "document_id"	INTEGER NOT NULL,
+          FOREIGN KEY("document_id") REFERENCES "documents"("id") ON DELETE CASCADE,
+          FOREIGN KEY("tag_id") REFERENCES "tags"("id") ON DELETE CASCADE,
+          PRIMARY KEY("tag_id","document_id")
+        )`
+      ).run();
+      this.storage[storage.id].db.prepare(
         `CREATE TABLE "rss_sources" (
           "id" INTEGER UNIQUE, "site_name" TEXT NOT NULL, "url" TEXT NOT NULL,
           "feed_url" TEXT NOT NULL, "thumb" BLOB, "thumb_mime" TEXT,
@@ -959,6 +995,14 @@ const CleePIX = {
   },
   createWindowInstance: function(mode) {
     const windowConfig = this.configTemp.window[mode];
+    if (mode === "notepad") {
+      const notepadKeys = Object.keys(this.Windows.notepad);
+      if (notepadKeys.length > 0) {
+        const notepadRect = this.Windows.notepad[Number(notepadKeys.slice(-1)[0])].getBounds();
+        windowConfig.x = windowConfig.x ? notepadRect.x - 50 : null;
+        windowConfig.y = windowConfig.y ? notepadRect.y + 50 : null;
+      }
+    }
     const window = new electron.BrowserWindow({
       width: windowConfig.width,
       minWidth: windowConfig.minWidth,
@@ -978,6 +1022,8 @@ const CleePIX = {
       }
     });
     if (mode === "main" && this.configTemp?.window?.main.isMaximize)
+      window.maximize();
+    else if (mode === "notepad" && this.configTemp?.window?.notepad.isMaximize)
       window.maximize();
     window.on("moved", () => {
       const rect = window.getNormalBounds();
@@ -1004,6 +1050,9 @@ const CleePIX = {
         break;
       case "clipboard":
         loadFile = "/clipboard.html";
+        break;
+      case "notepad":
+        loadFile = "/notepad.html";
         break;
       default:
         loadFile = "/index.html";

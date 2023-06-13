@@ -58,3 +58,14 @@ header {
     -webkit-app-region: no-drag;
   }
 }
+
+// ######################
+//  コンテンツパネル
+// ######################
+main#insert-panel {
+  height: calc( 100vh - 25.6px );
+  flex-basis: 100%;
+  //@include background( .6 );
+  background: rgba(0, 0, 0, .8);
+  backdrop-filter: blur(10px) contrast(140%) brightness(90%);
+}

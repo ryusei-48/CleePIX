@@ -29,7 +29,8 @@ const CleePIX: {
   Windows: {
     main?: BrowserWindow, forScraping: BrowserWindow | null,
     forScreenshot: BrowserWindow | null,
-    feedreader: BrowserWindow | null, clipboard: BrowserWindow | null
+    feedreader: BrowserWindow | null, clipboard: BrowserWindow | null,
+    notepad: { [key: number]: BrowserWindow }
   },
   extraStorage: { db?: Database.Database, stmt: {
     insertHistory?: Database.Statement, selectHistoryFirst?: Database.Statement
@@ -41,7 +42,7 @@ const CleePIX: {
   config: Store<storeConfig>, configTemp?: storeConfig,
   textAnalyzer?: kuromoji.Tokenizer<kuromoji.IpadicFeatures>,
   run: () => void, initializeDB: (storage: {label: string, id: number, path: string }) => void,
-  createWindowInstance: ( mode: 'main' | 'feedreader' | 'clipboard' ) => BrowserWindow,
+  createWindowInstance: ( mode: 'main' | 'feedreader' | 'clipboard' | 'notepad' ) => BrowserWindow,
   initializeExtraDB: () => void,
   shareParts: {
     getInstanceDatabasePath: ( instanceId: number ) => string | null,
@@ -56,7 +57,7 @@ const CleePIX: {
 } = {
 
   Windows: {
-    forScraping: null, forScreenshot: null, feedreader: null, clipboard: null,
+    forScraping: null, forScreenshot: null, feedreader: null, clipboard: null, notepad: []
   }, storage: {}, extraStorage: { stmt: {} },
   config: new Store<storeConfig>(/*{ encryptionKey: 'ymzkrk33' }*/),
 
@@ -68,7 +69,8 @@ const CleePIX: {
         window: {
           main: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
           feedreader: { width: 1360, minWidth: 1100, height: 830, minHeight: 671, x: null, y: null, isMaximize: false },
-          clipboard: { width: 400, minWidth: 400, height: 580, minHeight: 580, x: null, y: null, isMaximize: false, isFixation: false }
+          clipboard: { width: 400, minWidth: 400, height: 580, minHeight: 580, x: null, y: null, isMaximize: false, isFixation: false },
+          notepad: { width: 800, minWidth: 400, height: 450, minHeight: 225, x: null, y: null, isMaximize: false }
         },
         instance: [{
           label: 'default', id: 1,
@@ -622,6 +624,30 @@ const CleePIX: {
     });
 
     // ##############################################
+    // ノートパッドウィンドウ
+    // ##############################################
+    ipcMain.on('notepad-open', () => {
+      const newNotepad = this.createWindowInstance('notepad');
+
+      newNotepad.webContents.on('did-finish-load', () => {
+        newNotepad.webContents.send('window-id',  newNotepad.id );
+      });
+
+      newNotepad.show();
+      this.Windows.notepad[ newNotepad.id ] = newNotepad;
+    });
+
+    ipcMain.on('notepad-close', (_, windowId) => {
+      if ( windowId ) {
+        this.Windows.notepad[ windowId ].close();
+        this.Windows.notepad[ windowId ].on('closed', () => {
+          this.Windows.notepad[ windowId ].destroy();
+          delete this.Windows.notepad[ windowId ];
+        });
+      }
+    });
+
+    // ##############################################
     // アプリ起動準備完了時の処理
     // ##############################################
     app.whenReady().then( () => {
@@ -904,6 +930,25 @@ const CleePIX: {
         )`
       ).run();
 
+      this.storage[ storage.id ].db!.prepare(
+        `CREATE TABLE "documents" (
+          "id"	INTEGER, "data"	TEXT NOT NULL,
+          "register_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now', 'localtime')),
+          "update_time"	TIMESTAMP NOT NULL DEFAULT (DATETIME('now', 'localtime')),
+          PRIMARY KEY("id" AUTOINCREMENT)
+        )`
+      ).run();
+
+      this.storage[ storage.id ].db!.prepare(
+        `CREATE TABLE "docs_tags" (
+          "tag_id"	INTEGER NOT NULL,
+          "document_id"	INTEGER NOT NULL,
+          FOREIGN KEY("document_id") REFERENCES "documents"("id") ON DELETE CASCADE,
+          FOREIGN KEY("tag_id") REFERENCES "tags"("id") ON DELETE CASCADE,
+          PRIMARY KEY("tag_id","document_id")
+        )`
+      ).run();
+
       this.storage[storage.id].db!.prepare(
         `CREATE TABLE "rss_sources" (
           "id" INTEGER UNIQUE, "site_name" TEXT NOT NULL, "url" TEXT NOT NULL,
@@ -1014,6 +1059,14 @@ const CleePIX: {
   createWindowInstance: function ( mode ) {
 
     const windowConfig = <windowInitValues>this.configTemp!.window![ mode ];
+    if ( mode === 'notepad' ) {
+      const notepadKeys = Object.keys( this.Windows.notepad );
+      if ( notepadKeys.length > 0 ) {
+        const notepadRect = this.Windows.notepad[ Number( notepadKeys.slice(-1)[0] ) ].getBounds();
+        windowConfig.x = windowConfig.x ? notepadRect.x - 50 : null;
+        windowConfig.y = windowConfig.y ? notepadRect.y + 50 : null;
+      }
+    }
 
     const window = new BrowserWindow({
       width: windowConfig.width, minWidth: windowConfig.minWidth,
@@ -1031,6 +1084,7 @@ const CleePIX: {
     });
 
     if ( mode === 'main' && this.configTemp?.window?.main.isMaximize ) window.maximize();
+    else if ( mode === 'notepad' && this.configTemp?.window?.notepad.isMaximize ) window.maximize();
 
     window.on('moved', () => {
       const rect = window.getNormalBounds();
@@ -1060,6 +1114,8 @@ const CleePIX: {
         loadFile = '/feedreader.html'; break;
       case 'clipboard':
         loadFile = '/clipboard.html'; break;
+      case 'notepad':
+        loadFile = '/notepad.html'; break;
       default:
         loadFile = '/index.html'; break;
     }

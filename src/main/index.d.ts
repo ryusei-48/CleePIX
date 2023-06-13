@@ -10,7 +10,8 @@ export declare global {
   type storeConfig = {
     window?: {
       main: windowInitValues, feedreader: windowInitValues,
-      clipboard: windowInitValues & { isFixation: boolean }
+      clipboard: windowInitValues & { isFixation: boolean },
+      notepad: windowInitValues
     },
     instance?: { label: string, id: number, path: string }[],
     cache?: {

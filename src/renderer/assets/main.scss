@@ -11,6 +11,12 @@ header {
   .app-name {
     flex-basis: calc(100% - 216px);
     height: 100%;
+    img.icon {
+      display: inline;
+      width: 1em;
+      height: 1em;
+      margin: 0 5px;
+    }
   }
   .app-setings,
   #minimize-win,

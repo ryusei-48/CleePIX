@@ -29,7 +29,7 @@ export const main: {
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
-          <h1>CleePIX</h1>
+          <h1><img class="icon" src="./assets/icon.png" alt="アイコン画像" />CleePIX</h1>
         </div>
         <div class="app-setings"><button id="app-setings" aria-label="設定"><i class="fa-solid fa-gear"></i> 設定</button></div>
         <div id="hide-win"><button title="ウィンドウを隠す" aria-label="ウィンドウを隠す"><i class="fa-regular fa-eye-slash"></i></button></div>
@@ -342,7 +342,7 @@ export const feedreader: {
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
-          <h1>FeedReader - CleePIX</h1>
+          <h1><img class="icon" src="./assets/icon.png" alt="アイコン画像" />FeedReader - CleePIX</h1>
         </div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
         <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
@@ -376,7 +376,7 @@ export const clipboard: {
     dom.innerHTML = `
       <header class="animate__animated animate__fadeIn">
         <div class="app-name">
-          <h1>Clipboard Manager - CleePIX</h1>
+          <h1><img class="icon" src="./assets/icon.png" alt="アイコン画像" />Clipboard Manager - CleePIX</h1>
         </div>
         <div id="fixation-win"><button aria-label="ウィンドウを最前面に固定" title="ウィンドウを最前面に固定"><i class="fa-solid fa-thumbtack"></i></button></div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
@@ -496,4 +496,38 @@ export const clipboard: {
     `;
     return dom;
   }
+}
+
+export const notepad: {
+
+  base: () => HTMLDivElement
+
+} = {
+
+  base: function () {
+
+    const dom = main.initDivDom(false);
+    dom.classList.add('app-wrapper');
+    dom.innerHTML = `
+      <header class="animate__animated animate__fadeIn">
+        <div class="app-name">
+          <h1><img class="icon" src="./assets/icon.png" alt="アイコン画像" />notepad - CleePIX</h1>
+        </div>
+        <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
+        <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
+        <div id="close-win"><button aria-label="ウィンドウを隠す"><i class="fa-solid fa-xmark"></i></button></div>
+      </header>
+      <main id="insert-panel" class="animate__animated animate__fadeIn"></main>
+      <div class="tmp-doms">
+        <div hidden id="show-tag-context-menu-wrap"></div>
+        <div hidden id="show-tag-context-menu"></div>
+        <div inert id="show-loading-efect">
+          <div class="spinner">
+            <div></div> <div></div><div></div><div></div>    
+          </div>
+        </div>
+      </div>
+      `;
+    return dom;
+  },
 }
