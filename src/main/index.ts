@@ -1093,6 +1093,13 @@ const CleePIX: {
       this.config.set('window', this.configTemp!.window!);
     });
 
+    window.on('resized', () => {
+      const rect = window.getNormalBounds();
+      this.configTemp!.window![ mode ].width = rect.width;
+      this.configTemp!.window![ mode ].height = rect.height;
+      this.config.set('window', this.configTemp!.window!);
+    });
+
     window.on('maximize', () => {
       this.configTemp!.window![ mode ].isMaximize = true;
       this.config.set('window', this.configTemp!.window!);

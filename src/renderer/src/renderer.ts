@@ -1,7 +1,6 @@
 import "@fortawesome/fontawesome-free/js/all";
 import "animate.css";
 import "../../../node_modules/quill/dist/quill.snow.css";
-import Quill from "quill";
 import "../../preload/index.d";
 import { main as includeDom } from "./include.dom";
 

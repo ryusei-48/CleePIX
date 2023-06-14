@@ -6,18 +6,67 @@
 header {
   display: block;
   width: 100vw;
-  height: 25.6px;
-  background-color: rgb(21, 72, 88);
+  height: 40px;
+  background-color: #1e0009;
   -webkit-app-region: drag;
   @include flexbese;
   .app-name {
-    flex-basis: calc(100% - 120px);
+    flex-basis: 40px;
     height: 100%;
+    position: relative;
     img.icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate( -70%, -50% );
       display: inline;
       width: 1em;
       height: 1em;
       margin: 0 5px;
+    }
+  }
+  .doc-tabs-wrap {
+    flex-basis: calc(100% - 160px);
+    padding-top: 5px;
+    .doc-tabs {
+      float: left;
+      max-width: calc( 100% - 40px );
+      height: 100%;
+      > span.tab-wrap {
+        display: inline-block;
+        -webkit-app-region: no-drag;
+        width: auto;
+        height: 100%;
+        min-width: 100px;
+        max-width: 300px;
+        > button.tab {
+          display: inline-block;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          height: 100%;
+          padding: 0 15px;
+          background-color: #2d2d2d;
+          clip-path: polygon(0% 100%, 4% 0%, 96% 0%, 100% 100%);
+        }
+      }
+    }
+    .add-doc-btn-wrap {
+      float: left;
+      width: 40px;
+      padding: 5px;
+      text-align: center;
+      > button.add-doc-btn {
+        display: inline-block;
+        padding: 0 6px;
+        border-radius: 10px;
+        -webkit-app-region: no-drag;
+        font-size: 18pt;
+        cursor: pointer;
+        transition: all .3s ease-in-out;
+        &:hover {
+          background-color: #2d2d2d;
+        }
+      }
     }
   }
   .app-setings,
@@ -66,6 +115,51 @@ main#insert-panel {
   height: calc( 100vh - 25.6px );
   flex-basis: 100%;
   //@include background( .6 );
-  background: rgba(0, 0, 0, .8);
+  background: #272727;
   backdrop-filter: blur(10px) contrast(140%) brightness(90%);
+}
+
+div.doc-contents {
+  width: 100%;
+  height: 100%;
+  .doc {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-flow: column;
+    div.editer {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+    }
+  }
+}
+
+.ql-snow {
+  .ql-picker {
+      &.ql-size {
+          .ql-picker-label,
+          .ql-picker-item {
+              &::before {
+                  content: attr(data-value) !important;
+              }
+          }
+      }
+  }
+}
+
+dic.ql-toolbar.ql-snow {
+  border: none;
+}
+
+div.editer.ql-container {
+  iframe.ql-video {
+    max-width: unset;
+    width: 80vw;
+    aspect-ratio: 16 / 9;
+    margin: 0 auto;
+  }
+  p {
+    font-size: 12pt;
+  }
 }
