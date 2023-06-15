@@ -39,14 +39,35 @@ header {
         height: 100%;
         min-width: 100px;
         max-width: 300px;
+        position: relative;
         > button.tab {
           display: inline-block;
           white-space: nowrap;
           text-overflow: ellipsis;
           height: 100%;
           padding: 0 15px;
-          background-color: #2d2d2d;
+          padding-right: 35px;
+          background-color: #1e0009;
           clip-path: polygon(0% 100%, 4% 0%, 96% 0%, 100% 100%);
+          transition: background-color .2s ease-in-out;
+          &:hover {
+            background-color: #2d2d2d;
+          }
+        }
+        > button.tab.active {
+          background-color: #2d2d2d;
+        }
+        > button.close {
+          position: absolute;
+          top: 50%;
+          right: 10px;
+          transform: translateY( -50% );
+          padding: 3px;
+          border-radius: 10px;
+          background-color: transparent;
+          &:hover {
+            background-color: #4a4a4a;
+          }
         }
       }
     }
@@ -55,12 +76,14 @@ header {
       width: 40px;
       padding: 5px;
       text-align: center;
+      position: relative;
       > button.add-doc-btn {
         display: inline-block;
         padding: 0 6px;
         border-radius: 10px;
         -webkit-app-region: no-drag;
         font-size: 18pt;
+        background-color: transparent;
         cursor: pointer;
         transition: all .3s ease-in-out;
         &:hover {
@@ -115,23 +138,31 @@ main#insert-panel {
   height: calc( 100vh - 25.6px );
   flex-basis: 100%;
   //@include background( .6 );
-  background: #272727;
+  background: rgba(39, 39, 39, 0.8);
   backdrop-filter: blur(10px) contrast(140%) brightness(90%);
 }
 
 div.doc-contents {
   width: 100%;
   height: 100%;
+  position: relative;
   .doc {
+    position: absolute;
+    top: 0; left: 0;
     width: 100%;
     height: 100%;
     display: flex;
     flex-flow: column;
+    opacity: 0;
+    transition: opacity .3s ease-in-out;
     div.editer {
       width: 100%;
       height: 100%;
       overflow-y: auto;
     }
+  }
+  .doc.show {
+    opacity: 1;
   }
 }
 
@@ -148,8 +179,35 @@ div.doc-contents {
   }
 }
 
-dic.ql-toolbar.ql-snow {
+.ql-snow .ql-tooltip {
+  border: 1px solid rgb(95, 95, 95) !important;
+  background-color: #3a3a3a !important;
+  box-shadow: rgb(95, 95, 95) !important;
+}
+
+.ql-snow .ql-tooltip[data-mode=video]::before {
+  content: '動画埋め込み' !important;
+  color: $text-color;
+}
+
+.ql-snow .ql-tooltip input[type=text] {
+  border: none !important;
+  &::placeholder {
+    padding-top: 5px !important;
+    font-size: 10pt !important;
+  }
+}
+
+.ql-snow .ql-tooltip a {
+  color: $text-color;
+  background-color: #06c;
+  padding: 5px 16px 5px 0;
+  text-align: center;
+}
+
+div.ql-toolbar.ql-snow {
   border: none;
+  border-bottom: 1px solid rgb(95, 95, 95);
 }
 
 div.editer.ql-container {
@@ -162,4 +220,69 @@ div.editer.ql-container {
   p {
     font-size: 12pt;
   }
+}
+
+.ql-snow .ql-picker-options {
+  padding: unset;
+}
+
+.ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
+  border-color: #525252 !important;
+  background-color: #272727;
+  color: $text-color;
+  padding: 0;
+  span.ql-picker-item {
+    padding: 4px 8px;
+    color: $text-color;
+    &:hover {
+      background-color: #06c;
+    }
+  }
+}
+
+
+.ql-snow .ql-picker-options {
+  padding: none;
+}
+
+.ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-label {
+  border: none;
+}
+
+.ql-snow .ql-picker.ql-font .ql-picker-label::before,
+.ql-snow .ql-picker.ql-header .ql-picker-label::before,
+.ql-snow .ql-picker.ql-size .ql-picker-label::before {
+  color: $text-color;
+}
+/*
+.ql-snow .ql-stroke, .ql-snow .ql-fill {
+  stroke: $text-color;
+}*/
+
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="1"]::before {
+  content: '見出し１' !important;
+}
+
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="2"]::before {
+  content: '見出し２' !important;
+}
+
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="3"]::before {
+  content: '見出し３' !important;
+}
+
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="4"]::before {
+  content: '見出し４' !important;
+}
+
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="5"]::before {
+  content: '見出し５' !important;
+}
+
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="6"]::before {
+  content: '見出し６' !important;
+}
+
+.ql-snow .ql-picker.ql-header .ql-picker-item::before {
+  content: '段落' !important;
 }

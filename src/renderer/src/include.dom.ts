@@ -514,25 +514,17 @@ export const notepad: {
           <h1 title="notepad - CleePIX"><img class="icon" src="./assets/icon.png" alt="アイコン画像" /></h1>
         </div>
         <div class="doc-tabs-wrap">
-          <div class="doc-tabs">
-            <span class="tab-wrap">
-              <button class="tab">タイトルなし</button>
-            </span>
-          </div>
+          <div id="insert-doc-tabs" class="doc-tabs"></div>
           <div class="add-doc-btn-wrap">
-            <button class="add-doc-btn">+</button>
+            <button id="add-doc-btn" aria-label="タブを追加" title="タブを追加" class="add-doc-btn">+</button>
           </div>
         </div>
         <div id="minimize-win"><button aria-label="最小化"><i class="fa-solid fa-window-minimize"></i></button></div>
         <div id="maximize-win"><button aria-label="最大化"><i class="fa-regular fa-window-maximize"></i></button></div>
         <div id="close-win"><button aria-label="ウィンドウを隠す"><i class="fa-solid fa-xmark"></i></button></div>
       </header>
-      <main id="insert-panel" class="animate__animated animate__fadeIn">
-        <div class="doc-contents">
-          <div class="doc">
-            <div id="editer-test" class="editer"></div>
-          </div>
-        </div>
+      <main id="insert-panel">
+        <div id="insert-editer-content" class="doc-contents animate__animated animate__fadeIn"></div>
       </main>
       <div class="tmp-doms">
         <div hidden id="show-tag-context-menu-wrap"></div>

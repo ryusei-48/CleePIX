@@ -637,6 +637,16 @@ const CleePIX: {
       this.Windows.notepad[ newNotepad.id ] = newNotepad;
     });
 
+    ipcMain.on('notepad-maximize', (_, windowId) => {
+      if ( this.Windows.notepad[ windowId ].isMaximized() ) {
+        this.Windows.notepad[ windowId ].unmaximize();
+      } else this.Windows.notepad[ windowId ].maximize();
+    });
+
+    ipcMain.on('notepad-minimize', (_, windowId) => {
+      this.Windows.notepad[ windowId ].minimize();
+    });
+
     ipcMain.on('notepad-close', (_, windowId) => {
       if ( windowId ) {
         this.Windows.notepad[ windowId ].close();
