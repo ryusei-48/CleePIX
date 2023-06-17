@@ -70,8 +70,8 @@ export const notepad: {
 
     const tabSwitchHandler = ( tab: HTMLButtonElement ) => {
 
-      const oldTabId = Number( this.currentActiveTab?.dataset.tabId! ) - 1;
-      const tabId = Number( tab.dataset.tabId! ) - 1;
+      const oldTabId = Number( this.currentActiveTab?.dataset.tabId! );
+      const tabId = Number( tab.dataset.tabId! );
 
       this.currentActiveTab?.classList.remove('active');
       this.liveDom._editers[ oldTabId ].classList.remove('show');
@@ -91,6 +91,7 @@ export const notepad: {
       const removeTab = document.createElement('button');
 
       tabWrap.classList.add('tab-wrap');
+      tabWrap.draggable = true;
       tabButton.classList.add('tab', 'active');
       tabButton.textContent = tabName;
       removeTab.classList.add('close');
@@ -98,15 +99,38 @@ export const notepad: {
       removeTab.ariaLabel = 'タブを閉じる';
       removeTab.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
 
+      tabWrap.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData('text/plain', 'tab');
+      });
+
       tabButton.addEventListener('click', (e) => {
         tabSwitchHandler( <HTMLButtonElement>e.currentTarget )
+      });
+
+      removeTab.addEventListener('click', (e) => {
+
+        const tabId = Number( (<HTMLButtonElement>e.currentTarget).dataset.tabId! );
+        if ( this.currentActiveTab?.isEqualNode( this.liveDom._tabs[ tabId ].childNodes[0] ) ) {
+          if ( this.liveDom._tabs.filter((tab) => tab !== undefined ).length > 1 ) {
+            const nearTab = this.currentActiveTab.parentElement!.previousElementSibling ||
+              this.currentActiveTab.parentElement!.nextElementSibling!;
+            (<HTMLButtonElement>nearTab.childNodes[0]).click();
+          } else window.electron.ipcRenderer.send('notepad-close', this.windowId );
+        }
+
+        this.liveDom._tabs[ tabId ].remove();
+        delete this.liveDom._tabs[ tabId ];
+        this.liveDom._editers[ tabId ].remove();
+        delete this.liveDom._editers[ tabId ];
       });
 
       tabWrap.appendChild( tabButton );
       tabWrap.appendChild( removeTab );
 
       this.liveDom.tab?.insertAdjacentElement('beforeend', tabWrap );
-      tabButton.dataset.tabId = `${ this.liveDom._tabs.push( tabWrap ) }`;
+      const tabId = this.liveDom._tabs.push( tabWrap ) - 1;
+      tabButton.dataset.tabId = `${ tabId }`;
+      removeTab.dataset.tabId = `${ tabId }`;
 
       return tabButton;
     }
@@ -114,9 +138,11 @@ export const notepad: {
     const addEditer = ( addedTab: HTMLButtonElement ) => {
 
       const doc = document.createElement('div');
+      const statusBar = includeDom.statusBar();
 
       doc.classList.add('doc', 'show');
       doc.innerHTML = `<div class="editer"></div>`;
+      doc.append( statusBar );
 
       this.liveDom.editer?.insertAdjacentElement('beforeend', doc );
       doc.dataset.tabId = `${ this.liveDom._editers.push( doc ) }`;
@@ -139,16 +165,36 @@ export const notepad: {
             //[{ 'header': 1 }, { 'header': 2 }],               // custom button values
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             [{ 'direction': 'rtl' }],                         // text direction
-  
+
             [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
             [{ 'align': [] }],
-  
+
             ['image', 'video', 'code-block'],
           ]
         },
         placeholder: 'ここに本文を入力',
       });
       editer.focus();
+
+      editer.on('text-change', () => {
+        const index = editer.getSelection()?.index || 0;
+        const lineNumber = editer.getLines( 0,index ).length;
+        const [ _, lineIndex ] = editer.getLine( index );
+
+        (<HTMLSpanElement>statusBar.childNodes[3]).textContent = `文字数：${ editer.getLength() }`;
+        (<HTMLSpanElement>statusBar.childNodes[1]).textContent = `${ lineNumber } 行:${ lineIndex } 文字目`
+      });
+
+      editer.on('selection-change', (range) => {
+        const lineNumber = editer.getLines( 0, range.index ).length;
+        const [ _, lineIndex ] = editer.getLine( range.index );
+        if ( range.length > 0 ) {
+          (<HTMLSpanElement>statusBar.childNodes[3]).textContent = `選択文字数：${ range.length }`;
+        } else {
+          (<HTMLSpanElement>statusBar.childNodes[3]).textContent = `文字数：${ editer.getLength() }`;
+        }
+        (<HTMLSpanElement>statusBar.childNodes[1]).textContent = `${ lineNumber } 行:${ lineIndex } 文字目`
+      });
     }
 
     addEditer( addTab( 'タイトルなし' ) );
@@ -157,6 +203,13 @@ export const notepad: {
       .addEventListener('click', () => {
         addEditer( addTab( 'タイトルなし' ) );
       });
+
+    this.liveDom.tab?.addEventListener('dragover', (e) => { e.preventDefault() });
+
+    this.liveDom.tab?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      console.log(e.dataTransfer?.getData('text/plain'));
+    });
   }
 }
 

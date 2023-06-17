@@ -13,11 +13,23 @@ asarUnpack:
 afterSign: build/notarize.js
 win:
   executableName: CleePIX
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+    - target: appx
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+appx:
+  identityName: 36443LhapluLog.CleePIX
+  applicationId: LhapluLog.CleePIX
+  publisherDisplayName: Ryusei
+  publisher: CN=CEBD1DA5-A40A-4B88-9D6B-86B3FE07C8B4
+  languages: JA-JP
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

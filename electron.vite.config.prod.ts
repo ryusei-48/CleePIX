@@ -42,7 +42,8 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, './src/renderer/index.html'),
           clipboard: resolve(__dirname, './src/renderer/clipboard.html'),
-          feedreader: resolve(__dirname, './src/renderer/feedreader.html')
+          feedreader: resolve(__dirname, './src/renderer/feedreader.html'),
+          notepad: resolve(__dirname, './src/renderer/notepad.html')
         }
       },
       outDir: resolve(__dirname, 'compiled/renderer')

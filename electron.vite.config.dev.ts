@@ -14,7 +14,7 @@ export default defineConfig({
           index: resolve(__dirname, './src/main/index.ts'),
           import_bookmarks: resolve(__dirname, './src/main/thread-scripts/import-bookmarks.ts'),
           get_bookmarks: resolve(__dirname, './src/main/thread-scripts/get-bookmarks.ts'),
-          clip_history_search: resolve(__dirname, './src/main/thread-scripts/clip-history-search.ts')
+          clip_history_search: resolve(__dirname, './src/main/thread-scripts/clip-history-search.ts'),
         }
       },
       //minify: true,
@@ -38,7 +38,8 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, './src/renderer/index.html'),
           clipboard: resolve(__dirname, './src/renderer/clipboard.html'),
-          feedreader: resolve(__dirname, './src/renderer/feedreader.html')
+          feedreader: resolve(__dirname, './src/renderer/feedreader.html'),
+          notepad: resolve(__dirname, './src/renderer/notepad.html')
         }
       },
       outDir: resolve(__dirname, 'compiled/renderer')

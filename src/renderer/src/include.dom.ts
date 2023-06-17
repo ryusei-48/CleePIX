@@ -500,7 +500,7 @@ export const clipboard: {
 
 export const notepad: {
 
-  base: () => HTMLDivElement
+  base: () => HTMLDivElement, statusBar: () => HTMLDivElement
 
 } = {
 
@@ -538,4 +538,17 @@ export const notepad: {
       `;
     return dom;
   },
+
+  statusBar: () => {
+
+    const dom = document.createElement('div');
+    dom.classList.add('status-bar');
+    dom.innerHTML = `
+      <span class="line-number">１行：０文字目</span>
+      <span class="char-count">文字数：0</span>
+      <span class="char-code">文字コード：UTF-8</span>
+    `;
+
+    return dom;
+  }
 }
